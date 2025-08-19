@@ -1,0 +1,7 @@
+# Paths (edit)
+assignment_file=F:/UoPeople/CS1102/Unit7/assignment.txt
+code_file=F:/UoPeople/CS1102/Unit7/Begin.java
+output_file=F:/UoPeople/CS1102/Unit7/discussion_post.html
+
+# Theme: tango, monokai, rrt
+theme=tango
