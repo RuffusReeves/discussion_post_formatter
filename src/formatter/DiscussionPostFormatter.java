@@ -1,26 +1,51 @@
 package formatter;
 
+import java.util.Arrays;
+import java.util.Scanner;
+
 public class DiscussionPostFormatter {
     public static void main(String[] args) throws Exception {
-        // Load config
-        Config config = Config.load("config.txt");
+        Scanner scanner = new Scanner(System.in);
 
-        // Read assignment
-        String assignment = Utils.readFile(config.assignmentText);
+        // 1) Ask unit number
+        System.out.print("Enter the unit number: ");
+        String unitNumber = scanner.nextLine().trim();
 
-        // Read + highlight code
-        String code = Utils.readFile(config.codeFile);
-        String highlightedCode = Highlighter.highlight(code, config.style);
+        // 2) Load config with placeholder replacement
+        Config config = Config.load("config.txt", unitNumber);
 
-        // Run code and capture output
-        String output = Utils.runJavaFile(config.codeFile);
+        // 3) Optional theme override
+        String[] themes = Highlighter.availableThemes();
+        Arrays.sort(themes);
+        System.out.print("Enter theme (" + String.join(", ", themes) + ") or press Enter to use '" + config.theme + "': ");
+        String themeInput = scanner.nextLine().trim();
+        if (!themeInput.isEmpty()) {
+            config.theme = themeInput;
+        }
 
-        // Build HTML
-        String html = HtmlBuilder.build(assignment, highlightedCode, output);
+        scanner.close();
 
-        // Save HTML
-        Utils.writeFile(config.outputHtml, html);
+        // 4) Read assignment & code
+        String assignmentText = Utils.readFile(config.assignmentFile);
+        String codeText = Utils.readFile(config.codeFile);
 
-        System.out.println("Discussion post created at: " + config.outputHtml);
+        // 5) (Optional) run the Java file to capture output
+        String programOutput;
+        try {
+            programOutput = Utils.runJavaFile(config.codeFile);
+        } catch (Exception e) {
+            programOutput = "(Could not run program: " + e.getMessage() + ")";
+        }
+
+        // 6) Highlight code
+        String highlightedCode = Highlighter.highlight(codeText, config.theme);
+
+        // 7) Build HTML
+        String html = HtmlBuilder.build(assignmentText, highlightedCode, programOutput);
+
+        // 8) Write output
+        Utils.writeFile(config.outputFile, html);
+
+        System.out.println("Discussion post generated at: " + config.outputFile);
     }
 }

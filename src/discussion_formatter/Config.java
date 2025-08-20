@@ -8,6 +8,7 @@ public class Config {
     public String codeFile;
     public String outputFile;
     public String theme;
+    
     public static Config load(String path) throws IOException {
         Properties p = new Properties();
         try (FileInputStream fis = new FileInputStream(path)) { p.load(fis); }
