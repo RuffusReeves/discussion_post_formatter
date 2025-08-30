@@ -107,7 +107,7 @@ public class Utils {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(rproc.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                output.append(line).append("\\n");
+                output.append(line).append("\n");
             }
         }
         
@@ -115,7 +115,7 @@ public class Utils {
         
         // TODO: Handle runtime errors and exit codes
         if (runResult != 0) {
-            output.append("\\n[Program exited with code ").append(runResult).append("]");
+            output.append("\n[Program exited with code ").append(runResult).append("]");
         }
 
         return output.toString();
