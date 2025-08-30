@@ -1,87 +1,61 @@
 package formatter;
 
-import java.util.Arrays;
-import java.util.Scanner;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 
 /**
- * Main entry point for the Discussion Post Formatter application.
- * 
- * This class orchestrates the complete workflow for generating formatted HTML
- * discussion posts from course assignments and code files. It demonstrates
- * the processing pipeline and provides a minimal runnable example.
- * 
- * TODO: Refactor into smaller, testable methods
- * TODO: Add command-line argument parsing for batch mode
- * TODO: Implement comprehensive error handling with user-friendly messages
- * TODO: Add logging framework for debugging and monitoring
+ * Entry point for building a discussion post HTML output.
  */
 public class DiscussionPostFormatter {
-    
-    /**
-     * Main application entry point.
-     * 
-     * Current workflow:
-     * 1. Interactive user input for unit number and theme
-     * 2. Configuration loading with placeholder replacement
-     * 3. Content file loading (assignment, code)
-     * 4. Code execution and output capture
-     * 5. Syntax highlighting application
-     * 6. HTML assembly and output
-     * 
-     * TODO: Split this into smaller, focused methods
-     * TODO: Add validation for user inputs
-     * TODO: Implement retry logic for file operations
-     */
+
     public static void main(String[] args) throws Exception {
-        System.out.println("Discussion Post Formatter skeleton loaded.");
-        
-        Scanner scanner = new Scanner(System.in);
+        // Simple demo input sources (replace with real inputs or CLI args)
+        String assignmentText = """
+                Implement a program that prints "Hello, world!" and then the sum of two numbers.
+                Use clean code principles.
+                """;
 
-        // 1) Ask unit number
-        System.out.print("Enter the unit number: ");
-        String unitNumber = scanner.nextLine().trim();
+        // Pretend we loaded a Java source file
+        String javaSource = """
+                public class Hello {
+                    public static void main(String[] args) {
+                        // Print greeting
+                        System.out.println("Hello, world!");
+                        int a = 5;
+                        int b = 7;
+                        System.out.println("Sum = " + (a + b));
+                    }
+                }
+                """;
 
-        // 2) Load config with placeholder replacement
-        Config config = Config.load("config.txt", unitNumber);
-        System.out.println("Unit=" + unitNumber + ", Theme=" + config.theme);
+        // Simulated program output
+        String programOutput = """
+                Hello, world!
+                Sum = 12
+                """;
 
-        // 3) Optional theme override
-        String[] themes = Highlighter.availableThemes();
-        Arrays.sort(themes);
-        System.out.print("Enter theme (" + String.join(", ", themes) + ") or press Enter to use '" + config.theme + "': ");
-        String themeInput = scanner.nextLine().trim();
-        if (!themeInput.isEmpty()) {
-            config.theme = themeInput;
-        }
+        // 1. Optionally process inline code markers inside assignment text
+        String processedAssignment = InlineCodeProcessor.process(assignmentText);
 
-        scanner.close();
+        // 2. Highlight code (choose a theme: tango, monokai, dark, light)
+        String highlighted = Highlighter.highlight(javaSource, "tango");
 
-        // TODO: Implement ThemeLoader.loadTheme() to load from themes/default.json
-        // TODO: Implement InlineCodeProcessor.process() for assignment text
-        // TODO: Implement ContentBlock architecture for modular content handling
-        // TODO: Implement HtmlAssembler.assemble() for better HTML structure
+        // 3. Build content blocks
+        List<ContentBlock> blocks = List.of(
+                new ContentBlock.DefaultContentBlock(ContentBlock.Type.ASSIGNMENT_TEXT, processedAssignment),
+                new ContentBlock.DefaultContentBlock(ContentBlock.Type.HIGHLIGHTED_CODE, highlighted),
+                new ContentBlock.DefaultContentBlock(ContentBlock.Type.PROGRAM_OUTPUT, programOutput),
+                new ContentBlock.DefaultContentBlock(ContentBlock.Type.EXPLANATION_PLACEHOLDER, "")
+        );
 
-        // 4) Read assignment & code
-        String assignmentText = Utils.readFile(config.assignmentFile);
-        String codeText = Utils.readFile(config.codeFile);
+        // 4. Assemble full HTML
+        String html = HtmlAssembler.assemble(blocks);
 
-        // 5) (Optional) run the Java file to capture output
-        String programOutput;
-        try {
-            programOutput = Utils.runJavaFile(config.codeFile);
-        } catch (Exception e) {
-            programOutput = "(Could not run program: " + e.getMessage() + ")";
-        }
+        // 5. Write to file (or stdout)
+        Path out = Path.of("discussion_post.html");
+        Files.writeString(out, html);
 
-        // 6) Highlight code
-        String highlightedCode = Highlighter.highlight(codeText, config.theme);
-
-        // 7) Build HTML
-        String html = HtmlBuilder.build(assignmentText, highlightedCode, programOutput);
-
-        // 8) Write output
-        Utils.writeFile(config.outputFile, html);
-
-        System.out.println("Discussion post generated at: " + config.outputFile);
+        System.out.println("Generated: " + out.toAbsolutePath());
     }
 }

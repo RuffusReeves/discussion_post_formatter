@@ -1,10 +1,12 @@
 # Discussion Post Formatter Configuration
 # This file uses Java Properties format with placeholder support
 
+# Default unit number (used if no unit number is provided)
+unit=0
+# Theme settings (available: default, tango, monokai, rrt, light, dark)
+theme=default
 # File paths with unit number placeholder support
 assignment_file=assignments/unit_<UNIT_NUMBER>_assignment.txt
 code_file=code/unit_<UNIT_NUMBER>/Begin.java
-output_file=output/unit_<UNIT_NUMBER>_discussion_post.html
+output_file=assignments/unit_<UNIT_NUMBER>_discussion_post.html
 
-# Theme settings (available: default, tango, monokai, rrt, light, dark)
-theme=default
