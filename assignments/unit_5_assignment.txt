@@ -1,0 +1,10 @@
+Unit 5 Assignment - Object-Oriented Programming
+
+Write a Java program that demonstrates the following concepts:
+1. Class definition with private fields
+2. Constructor with parameters
+3. Getter and setter methods
+4. Method overriding
+5. Polymorphism
+
+Your program should create a simple hierarchy of classes representing different types of vehicles.
