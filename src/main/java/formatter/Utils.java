@@ -91,7 +91,7 @@ public class Utils {
                 StringBuilder errors = new StringBuilder();
                 String line;
                 while ((line = errorReader.readLine()) != null) {
-                    errors.append(line).append("\\n");
+                    errors.append(line).append("\n");
                 }
                 return "[Compilation failed]\\n" + errors.toString();
             }
