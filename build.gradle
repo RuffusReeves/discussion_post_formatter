@@ -1,0 +1,33 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Future dependencies can be added here
+    // For HTML tidying: implementation 'org.jsoup:jsoup:1.16.1'
+    // For JSON parsing: implementation 'com.fasterxml.jackson.core:jackson-core:2.15.2'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+application {
+    mainClass = 'formatter.DiscussionPostFormatter'
+}
+
+tasks.named('run') {
+    standardInput = System.in
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'formatter.DiscussionPostFormatter'
+    }
+}

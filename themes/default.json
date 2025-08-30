@@ -1,0 +1,32 @@
+{
+  "name": "default",
+  "description": "Default syntax highlighting theme with light background",
+  "background": "#f8f8f8",
+  "foreground": "#2e3436",
+  "colors": {
+    "keyword": {
+      "color": "#204a87",
+      "fontWeight": "bold"
+    },
+    "string": {
+      "color": "#4e9a06"
+    },
+    "comment": {
+      "color": "#888a85",
+      "fontStyle": "italic"
+    },
+    "number": {
+      "color": "#ad7fa8"
+    },
+    "type": {
+      "color": "#3465a4",
+      "fontWeight": "bold"
+    },
+    "operator": {
+      "color": "#2e3436"
+    },
+    "identifier": {
+      "color": "#2e3436"
+    }
+  }
+}
