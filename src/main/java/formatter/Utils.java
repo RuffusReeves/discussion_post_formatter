@@ -93,7 +93,7 @@ public class Utils {
                 while ((line = errorReader.readLine()) != null) {
                     errors.append(line).append("\n");
                 }
-                return "[Compilation failed]\\n" + errors.toString();
+                return "[Compilation failed]\n" + errors.toString();
             }
         }
 
