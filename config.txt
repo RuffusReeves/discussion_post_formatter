@@ -1,12 +1,51 @@
 # Discussion Post Formatter Configuration
-# This file uses Java Properties format with placeholder support
+# --------------------------------------
+# Edit the key = value pairs below. Lines starting with '#' are comments.
+#
+# Tokens:
+#   <UNIT_NUMBER>   Replaced at runtime with the current unit value when
+#                   resolving file paths. (The file itself keeps the token
+#                   so you can change 'unit' and reuse the same patterns.)
+#
+# Changing Values:
+#   - 'unit': numeric (e.g., 0, 1, 2...). When you change it via the program
+#             the file paths containing <UNIT_NUMBER> resolve automatically.
+#   - 'theme': arbitrary string (e.g., default, dark, light). Currently no
+#              placeholder substitution in paths; it's just a plain value.
+#
+# Adding New Keys:
+#   - Add new_key = some_value
+#   - They will be preserved with ordering when the program saves.
+#
+# Removing Keys:
+#   - Delete the line manually, OR have the program set it to null (not yet exposed).
+#
+# NOTE:
+#   Comments and blank lines are preserved when the program updates values.
+#   The program normalizes entry lines to: key = value
+#
+# Core Settings
+unit = 0
+theme = default
 
-# Default unit number (used if no unit number is provided)
-unit=0
-# Theme settings (available: default, tango, monokai, rrt, light, dark)
-theme=default
-# File paths with unit number placeholder support
-assignment_file=assignments/unit_<UNIT_NUMBER>_assignment.txt
-code_file=code/unit_<UNIT_NUMBER>/Begin.java
-output_file=assignments/unit_<UNIT_NUMBER>_discussion_post.html
+# Input Text Sections
+assignment_text_file_address = ../assignments/assignment_text.txt
+assignment_sample_code_file_address = ../assignments/assignment_sample_code.txt
+introduction_text_file_address = ../assignments/introduction.txt
+explanation1_text_file_address = ../assignments/explanation1.txt
+explanation2_text_file_address = ../assignments/explanation2.txt
 
+# Source Code (uses the unit token)
+code_file_address = ../CS 1102-01 - AY2026-T1/cs_1102_base/src/cs_1102_base/Unit_<UNIT_NUMBER>/Discussion_Assignment.java
+
+# Compiler / Runtime Output
+compiler_messages_file_address = ../assignments/compiler_messages.txt
+program_output_file_address = ../assignments/program_output.txt
+
+# Discussion Assignment Specific Inputs
+assignment_text_for_discussion_question_file_address = ../assignments/assignment_text_for_discussion_question.txt
+discussion_question_file_address = ../assignments/dicussion_question.txt
+references_file_address = ../assignments/references_file_content.txt
+
+# Final Output (contains the unit token)
+output_file_address = ../assignments/unit_<UNIT_NUMBER>_discussion_post.html

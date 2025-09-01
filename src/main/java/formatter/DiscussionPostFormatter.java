@@ -1,61 +1,67 @@
 package formatter;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 
 /**
- * Entry point for building a discussion post HTML output.
+ * Prompts user to optionally change unit and theme.
+ * If either changes, the config file is rewritten (comments preserved).
+ * Paths containing <UNIT_NUMBER> are resolved at usage time.
  */
 public class DiscussionPostFormatter {
 
     public static void main(String[] args) throws Exception {
-        // Simple demo input sources (replace with real inputs or CLI args)
-        String assignmentText = """
-                Implement a program that prints "Hello, world!" and then the sum of two numbers.
-                Use clean code principles.
-                """;
+        Config config = Config.load("config.txt");
 
-        // Pretend we loaded a Java source file
-        String javaSource = """
-                public class Hello {
-                    public static void main(String[] args) {
-                        // Print greeting
-                        System.out.println("Hello, world!");
-                        int a = 5;
-                        int b = 7;
-                        System.out.println("Sum = " + (a + b));
-                    }
-                }
-                """;
+        String currentUnit = config.get("unit");
+        String currentTheme = config.get("theme");
 
-        // Simulated program output
-        String programOutput = """
-                Hello, world!
-                Sum = 12
-                """;
+        System.out.println("Current unit  : " + currentUnit);
+        System.out.println("Current theme : " + currentTheme);
+        System.out.println();
 
-        // 1. Optionally process inline code markers inside assignment text
-        String processedAssignment = InlineCodeProcessor.process(assignmentText);
+        String newUnit  = prompt("Enter new unit (digits only, Enter to keep): ");
+        String newTheme = prompt("Enter new theme (Enter to keep): ");
 
-        // 2. Highlight code (choose a theme: tango, monokai, dark, light)
-        String highlighted = Highlighter.highlight(javaSource, "tango");
+        boolean changed = false;
 
-        // 3. Build content blocks
-        List<ContentBlock> blocks = List.of(
-                new ContentBlock.DefaultContentBlock(ContentBlock.Type.ASSIGNMENT_TEXT, processedAssignment),
-                new ContentBlock.DefaultContentBlock(ContentBlock.Type.HIGHLIGHTED_CODE, highlighted),
-                new ContentBlock.DefaultContentBlock(ContentBlock.Type.PROGRAM_OUTPUT, programOutput),
-                new ContentBlock.DefaultContentBlock(ContentBlock.Type.EXPLANATION_PLACEHOLDER, "")
-        );
+        // Validate & apply unit
+        if (newUnit != null && !newUnit.isBlank() && !newUnit.equals(currentUnit)) {
+            if (newUnit.matches("\\d+")) {
+                config.set("unit", newUnit);
+                changed = true;
+            } else {
+                System.out.println("Ignoring invalid unit (must be digits).");
+            }
+        }
 
-        // 4. Assemble full HTML
-        String html = HtmlAssembler.assemble(blocks);
+        // Apply theme (no placeholder handling now)
+        if (newTheme != null && !newTheme.isBlank() && !newTheme.equals(currentTheme)) {
+            config.set("theme", newTheme.trim());
+            changed = true;
+        }
 
-        // 5. Write to file (or stdout)
-        Path out = Path.of("discussion_post.html");
-        Files.writeString(out, html);
+        if (changed) {
+            config.save();
+            System.out.println("Configuration updated and saved to config.txt.");
+            // Optional reload (not strictly required)
+            config = config.reload();
+        } else {
+            System.out.println("No changes made.");
+        }
 
-        System.out.println("Generated: " + out.toAbsolutePath());
+        System.out.println();
+        System.out.println(config.toString());
+        System.out.println(config.toResolvedString());
+
+        // Example of using a resolved path
+        String outputResolved = config.getResolved("output_file_address");
+        System.out.println("Resolved output_file_address: " + outputResolved);
+    }
+
+    private static String prompt(String msg) throws Exception {
+        System.out.print(msg);
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        return br.readLine();
     }
 }
