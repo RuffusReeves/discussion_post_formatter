@@ -1,0 +1,18 @@
+{
+  "name": "sunburst",
+  "description": "Sunburst (TextMate) inspired vibrant dark theme",
+  "background": "#000000",
+  "foreground": "#f8f8f8",
+  "styles": {
+    "keyword": "color:#e28964;font-weight:bold;",
+    "string": "color:#65b042;",
+    "comment": "color:#aeaeae;font-style:italic;",
+    "number": "color:#3387cc;",
+    "type": "color:#99cf50;font-weight:bold;",
+    "function": "color:#e9c062;",
+    "constant": "color:#3387cc;",
+    "annotation": "color:#9b859d;",
+    "operator": "color:#f8f8f8;",
+    "punctuation": "color:#f8f8f8;"
+  }
+}

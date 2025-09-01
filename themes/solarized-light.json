@@ -1,0 +1,18 @@
+{
+  "name": "solarized-light",
+  "description": "Solarized Light palette",
+  "background": "#fdf6e3",
+  "foreground": "#657b83",
+  "styles": {
+    "keyword": "color:#859900;font-weight:bold;",
+    "string": "color:#2aa198;",
+    "comment": "color:#93a1a1;font-style:italic;",
+    "number": "color:#b58900;",
+    "type": "color:#268bd2;font-weight:bold;",
+    "function": "color:#6c71c4;",
+    "constant": "color:#cb4b16;",
+    "annotation": "color:#d33682;",
+    "operator": "color:#586e75;",
+    "punctuation": "color:#586e75;"
+  }
+}

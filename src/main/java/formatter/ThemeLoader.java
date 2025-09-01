@@ -1,130 +1,120 @@
 package formatter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Loads and manages syntax highlighting themes from JSON files.
- * 
- * This class handles loading theme definitions from the themes/ directory
- * and provides a bridge between JSON theme files and the internal theme
- * representation used by the Highlighter.
- * 
- * TODO: Implement actual JSON parsing once JSON library is available
- * TODO: Add theme validation and error handling
- * TODO: Implement theme caching for performance
- * TODO: Add support for theme inheritance and mixins
+ * Minimal, dependency-free loader for the constrained JSON structure used by theme files.
+ * NOT a general JSON parser. Assumes well-formed theme JSON.
  */
-public class ThemeLoader {
-    
-    private static final String THEMES_DIRECTORY = "themes";
-    private static final String DEFAULT_THEME = "default";
-    
-    /**
-     * Loads a theme by name from the themes directory.
-     * 
-     * Currently returns theme content as a string. When JSON parsing is
-     * implemented, this will return a structured Theme object.
-     * 
-     * @param themeName Name of the theme to load (without .json extension)
-     * @return Theme content as string, or null if theme not found
-     * 
-     * TODO: Parse JSON and return structured Theme object
-     * TODO: Implement theme validation against schema
-     * TODO: Add comprehensive error handling with fallbacks
-     */
-    public static String loadTheme(String themeName) {
-        if (themeName == null || themeName.trim().isEmpty()) {
-            themeName = DEFAULT_THEME;
+public final class ThemeLoader {
+
+    private ThemeLoader() {}
+
+    public static Theme load(String themeName) {
+        if (themeName == null || themeName.isBlank()) {
+            System.out.println("Theme name is blank.");
+            return null;
         }
-        
-        Path themePath = Paths.get(THEMES_DIRECTORY, themeName + ".json");
-        
+        Path path = Path.of("themes", themeName + ".json");
+        if (!Files.isRegularFile(path)) {
+            System.out.println("Theme file not found: " + path);
+            return null;
+        }
         try {
-            if (Files.exists(themePath)) {
-                return Files.readString(themePath);
-            } else {
-                // Fallback to default theme
-                Path defaultPath = Paths.get(THEMES_DIRECTORY, DEFAULT_THEME + ".json");
-                if (Files.exists(defaultPath)) {
-                    return Files.readString(defaultPath);
+            String json = Files.readString(path, StandardCharsets.UTF_8);
+            return parseTheme(json);
+        } catch (IOException e) {
+            System.out.println("Failed to read theme file: " + e.getMessage());
+            return null;
+        } catch (RuntimeException e) {
+            System.out.println("Failed to parse theme file: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static Theme parseTheme(String json) {
+        // Remove CR, trim
+        String src = json.replace("\r", "").trim();
+
+        String name = extractString(src, "\"name\"");
+        String description = extractString(src, "\"description\"");
+        String background = extractString(src, "\"background\"");
+        String foreground = extractString(src, "\"foreground\"");
+        String stylesObject = extractObject(src, "\"styles\"");
+        Map<String,String> styles = parseStyles(stylesObject);
+
+        return new Theme(name, description, background, foreground, styles);
+    }
+
+    private static Map<String,String> parseStyles(String stylesJson) {
+        Map<String,String> map = new LinkedHashMap<>();
+        if (stylesJson == null || stylesJson.isBlank()) return map;
+
+        // Very naive: split on quotes around keys.
+        // Pattern: "token": "css;..."
+        int idx = 0;
+        while (idx < stylesJson.length()) {
+            int keyStart = stylesJson.indexOf('"', idx);
+            if (keyStart < 0) break;
+            int keyEnd = stylesJson.indexOf('"', keyStart + 1);
+            if (keyEnd < 0) break;
+            String key = stylesJson.substring(keyStart + 1, keyEnd);
+
+            int colon = stylesJson.indexOf(':', keyEnd);
+            if (colon < 0) break;
+            int valueStart = stylesJson.indexOf('"', colon);
+            if (valueStart < 0) break;
+            int valueEnd = stylesJson.indexOf('"', valueStart + 1);
+            if (valueEnd < 0) break;
+            String value = stylesJson.substring(valueStart + 1, valueEnd);
+
+            map.put(key, value);
+            idx = valueEnd + 1;
+        }
+        return map;
+    }
+
+    /**
+     * Extracts a simple string value "key": "value"
+     */
+    private static String extractString(String src, String keyLiteral) {
+        int k = src.indexOf(keyLiteral);
+        if (k < 0) return null;
+        int colon = src.indexOf(':', k + keyLiteral.length());
+        if (colon < 0) return null;
+        int q1 = src.indexOf('"', colon + 1);
+        if (q1 < 0) return null;
+        int q2 = src.indexOf('"', q1 + 1);
+        if (q2 < 0) return null;
+        return src.substring(q1 + 1, q2);
+    }
+
+    /**
+     * Extracts the JSON object text for "key": { ... }
+     */
+    private static String extractObject(String src, String keyLiteral) {
+        int k = src.indexOf(keyLiteral);
+        if (k < 0) return null;
+        int colon = src.indexOf(':', k + keyLiteral.length());
+        if (colon < 0) return null;
+        int braceStart = src.indexOf('{', colon + 1);
+        if (braceStart < 0) return null;
+        int depth = 0;
+        for (int i = braceStart; i < src.length(); i++) {
+            char c = src.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return src.substring(braceStart, i + 1);
                 }
             }
-        } catch (IOException e) {
-            // TODO: Add proper logging
-            System.err.println("Warning: Could not load theme '" + themeName + "': " + e.getMessage());
         }
-        
-        return null; // Will trigger built-in theme fallback in Highlighter
-    }
-    
-    /**
-     * Parses theme JSON content into a color mapping.
-     * 
-     * This is a placeholder implementation that will be enhanced once
-     * JSON parsing is properly implemented.
-     * 
-     * @param themeJson JSON content of the theme
-     * @return Map of token types to color styles
-     * 
-     * TODO: Implement proper JSON parsing
-     * TODO: Add validation for required theme properties
-     * TODO: Support for nested color definitions and inheritance
-     */
-    public static Map<String, String> parseThemeColors(String themeJson) {
-        // TODO: Implement JSON parsing here
-        // For now, return empty map to trigger built-in theme fallback
-        
-        // Example of what this method should do:
-        // 1. Parse JSON using chosen library (Jackson, Gson, or manual parser)
-        // 2. Extract color definitions for each token type
-        // 3. Validate color format (hex, rgb, named colors)
-        // 4. Return map of token_type -> css_style
-        
-        return Map.of(); // Placeholder - triggers fallback to built-in themes
-    }
-    
-    /**
-     * Checks if a theme exists in the themes directory.
-     * 
-     * @param themeName Name of the theme to check
-     * @return true if theme file exists, false otherwise
-     */
-    public static boolean themeExists(String themeName) {
-        if (themeName == null || themeName.trim().isEmpty()) {
-            return false;
-        }
-        
-        Path themePath = Paths.get(THEMES_DIRECTORY, themeName + ".json");
-        return Files.exists(themePath);
-    }
-    
-    /**
-     * Lists all available themes in the themes directory.
-     * 
-     * @return Array of theme names (without .json extension)
-     * 
-     * TODO: Add sorting and filtering options
-     * TODO: Include theme metadata (description, author, etc.)
-     */
-    public static String[] listAvailableThemes() {
-        try {
-            Path themesDir = Paths.get(THEMES_DIRECTORY);
-            if (!Files.exists(themesDir)) {
-                return new String[]{DEFAULT_THEME};
-            }
-            
-            return Files.list(themesDir)
-                    .filter(path -> path.toString().endsWith(".json"))
-                    .map(path -> path.getFileName().toString().replace(".json", ""))
-                    .toArray(String[]::new);
-        } catch (IOException e) {
-            // TODO: Add proper logging
-            System.err.println("Warning: Could not list themes: " + e.getMessage());
-            return new String[]{DEFAULT_THEME};
-        }
+        return null;
     }
 }

@@ -1,175 +1,212 @@
-# Discussion Post Formatter - Technical Specification
+# Discussion Post Formatter - Technical Specification (Updated)
 
-## Overview
+Version: 0.1.1  
+Date: 2025-09-01  
+Repository: https://github.com/RuffusReeves/discussion_post_formatter  
 
-The Discussion Post Formatter is a Java application designed to automatically generate formatted HTML discussion posts from course assignments and code files. It combines assignment text, syntax-highlighted code, program execution output, and provides a structured template for student explanations.
+## Reality vs Plan
 
-## Architecture
+This specification now separates CURRENT IMPLEMENTATION from PLANNED DESIGN to prevent overstatement.
 
-### Core Components
+## 1. Overview
 
-#### 1. Main Entry Point (`DiscussionPostFormatter`)
-- **Purpose**: Main application entry point and workflow orchestration
-- **Responsibilities**:
-  - Parse command-line arguments and configuration
-  - Coordinate processing pipeline
-  - Handle user interaction for unit number and theme selection
-  - Output final HTML result
+CURRENT:
+- Java console utility for editing and persisting unit and theme in config.txt with comment preservation.
+- Resolves <UNIT_NUMBER> placeholder in values when displayed/used.
 
-#### 2. Configuration System (`Config`)
-- **Purpose**: Manage application configuration and file path resolution
-- **Responsibilities**:
-  - Load configuration from `config.txt`
-  - Support placeholder replacement (e.g., `<UNIT_NUMBER>`)
-  - Provide default values for missing configuration
+PLANNED:
+- Full pipeline generating a single HTML artifact per unit combining multiple content sources (assignment text, explanations, code, compiler output, runtime output, question, references) with inline styling only.
 
-#### 3. Content Processing Pipeline
+## 2. Architecture
 
-##### a. InlineCodeProcessor (TODO)
-- **Purpose**: Process inline code elements within assignment text
-- **Responsibilities**:
-  - Identify inline code patterns (e.g., `code` or \`\`\`code\`\`\`)
-  - Apply basic syntax highlighting for inline snippets
-  - Handle code escaping and HTML entity encoding
+### 2.1 Implemented Components
 
-##### b. ThemeLoader
-- **Purpose**: Load and manage syntax highlighting themes
-- **Responsibilities**:
-  - Load theme definitions from JSON files in `themes/` directory
-  - Provide color and style mappings for syntax elements
-  - Support fallback to default theme
+1. DiscussionPostFormatter (Main)
+   - Loads config
+   - Prompts for unit/theme
+   - Persists changes if modified
+   - Prints raw and resolved configs
 
-##### c. Syntax Highlighter (`Highlighter`)
-- **Purpose**: Apply syntax highlighting to Java code
-- **Responsibilities**:
-  - Tokenize Java source code
-  - Apply theme-based coloring to keywords, strings, comments, etc.
-  - Generate HTML with embedded CSS styles
+2. Config
+   - Parses config.txt retaining line structure
+   - Maintains ordered line model (ENTRY / COMMENT / BLANK)
+   - Updates existing keys in place; appends new keys
+   - Resolves <UNIT_NUMBER> placeholders at access time
+   - (Theme placeholder intentionally not implemented)
 
-#### 4. Content Assembly
+### 2.2 Planned Components (Not Yet Implemented)
 
-##### a. ContentBlock (Interface/Record)
-- **Purpose**: Represent different types of content blocks
-- **Properties**:
-  - `type`: Enum (ASSIGNMENT_TEXT, HIGHLIGHTED_CODE, PROGRAM_OUTPUT, EXPLANATION_PLACEHOLDER)
-  - `content`: Raw content string
-  - `metadata`: Optional metadata map
+- ThemeLoader: Load theme definition (JSON or properties) mapping token → inline style fragment.
+- Highlighter: Tokenize Java (keywords, strings, comments) and wrap spans with inline style attributes.
+- InlineCodeProcessor: Scan narrative text for inline code markers and wrap appropriately.
+- ContentBlock (record/class): (type, content, metadata) for modular assembly.
+- HtmlAssembler: Convert ordered ContentBlock list into final HTML snippet with required container.
+- ExecutionService: Compile + run Java sources, capturing compiler diagnostics and runtime output.
+- FileCollector: Enumerate code files for unit (avoid shell wildcards; use secure traversal).
+- HtmlTidyIntegration (optional): Pretty-print / normalize output.
 
-##### b. HtmlAssembler
-- **Purpose**: Assemble final HTML output from content blocks
-- **Responsibilities**:
-  - Take list of ContentBlock objects
-  - Apply consistent HTML structure and styling
-  - Generate semantic HTML with proper CSS classes
+## 3. Configuration Format
 
-#### 5. Utility Services
-
-##### a. File I/O (`Utils`)
-- **Purpose**: Handle file operations
-- **Responsibilities**:
-  - Read assignment and code files
-  - Write HTML output
-  - Execute Java programs and capture output
-
-## Configuration Format
-
-The `config.txt` file uses Java Properties format:
-
-```properties
-# File paths with placeholder support
-assignment_file=path/to/unit_<UNIT_NUMBER>_assignment.txt
-code_file=path/to/unit_<UNIT_NUMBER>/Begin.java
-output_file=path/to/unit_<UNIT_NUMBER>_discussion_post.html
-
-# Appearance settings
-theme=default
+CURRENT:
+```
+# Comments preserved
+unit = 3
+theme = default
+output_file_address = ../assignments/unit_<UNIT_NUMBER>_discussion_post.html
 ```
 
-## Theme System
+RULES:
+- Lines beginning with # or // treated as comments and preserved verbatim.
+- Only <UNIT_NUMBER> replaced when accessing values (never rewritten inside file).
+- Malformed lines (lacking '=') are treated as comments to avoid data loss.
 
-Themes are defined in JSON format in the `themes/` directory:
+FUTURE:
+- Possible addition: main_class, theme_file, explanation_n_file, reference_file, etc.
+- Potential generic placeholder expansion API (whitelist tokens).
 
-```json
-{
-  "name": "theme_name",
-  "description": "Theme description",
-  "background": "#ffffff",
-  "foreground": "#000000",
-  "colors": {
-    "keyword": {"color": "#0000ff", "fontWeight": "bold"},
-    "string": {"color": "#008000"},
-    "comment": {"color": "#808080", "fontStyle": "italic"}
+## 4. Processing Workflow (Staged)
+
+Stage 0 (DONE): Config editing + placeholder resolution.  
+Stage 1 (NEXT): Minimal HTML output using static template + resolved paths (no dynamic content).  
+Stage 2: Ingest text files and embed content; simple <pre><code> blocks.  
+Stage 3: Compilation and runtime capture integration.  
+Stage 4: Syntax highlighting (regex-based MVP).  
+Stage 5: ThemeLoader + inline style mapping.  
+Stage 6: ContentBlock abstraction & HtmlAssembler refactor.  
+Stage 7: Inline code detection in narrative text.  
+Stage 8: Tidy / formatting pass.  
+Stage 9: Test suite expansion & robustness improvements.
+
+## 5. Theming
+
+CURRENT:
+- theme key stored only.
+
+PLANNED:
+- Theme definition file: themes/<name>.json or .properties
+  Example JSON (planned):
+  ```
+  {
+    "name": "default",
+    "styles": {
+      "keyword": "color:#0000ff;font-weight:bold;",
+      "string": "color:#008000;",
+      "comment": "color:#808080;font-style:italic;"
+    }
   }
-}
+  ```
+- Highlighter consumes resolved style fragments.
+
+## 6. Syntax Highlighting (Planned MVP)
+
+Regex pass order (provisional):
+1. Multi-line comments
+2. Single-line comments
+3. String literals (handle escapes)
+4. Char literals
+5. Keywords boundary-matched
+6. Numbers
+Wrap each token in <span style="...">...</span> using theme style lookups.
+
+## 7. HTML Assembly (Planned)
+
+Container:
+```
+<div style="padding:10px;border:0;zoom:110%;width:600px;">
+  ... blocks ...
+</div>
 ```
 
-## Processing Workflow
+Block Types (planned):
+- Assignment Text
+- Sample Code (optional)
+- Highlighted Code (per source file)
+- Compiler Messages
+- Program Output
+- Explanation(s)
+- Question (Assignment Text segment + user question)
+- References
 
-1. **Initialization**
-   - Load configuration from `config.txt`
-   - Prompt user for unit number and optional theme override
-   - Initialize theme system
+Each block: consistent outer margin, heading, content area.
 
-2. **Content Loading**
-   - Read assignment text file
-   - Read Java source code file
-   - Attempt to compile and execute Java code to capture output
+## 8. Error Handling Strategy (Target)
 
-3. **Content Processing**
-   - Process inline code elements in assignment text
-   - Apply syntax highlighting to Java source code
-   - Create ContentBlock objects for each content type
+| Scenario | Action |
+|----------|--------|
+| Missing file | Insert placeholder notice + log |
+| Compilation failure | Embed compiler output; skip runtime |
+| Runtime exception | Embed stack trace or concise message |
+| Theme missing | Fallback to default theme; note fallback |
+| Invalid unit input | Retain previous value; notify user |
 
-4. **HTML Assembly**
-   - Assemble ContentBlock objects into structured HTML
-   - Apply consistent styling and layout
-   - Include placeholder for student explanation
+CURRENT: Only invalid unit (non-digit) silently ignored with message.
 
-5. **Output**
-   - Write final HTML to configured output file
-   - Display success message with file location
+## 9. Testing Plan (Incremental)
 
-## Future Enhancements
+Short-Term:
+- Config round-trip (preserve comments, order)
+- Placeholder resolution test
 
-### Phase 2: Enhanced Processing
-- [ ] Support for multiple programming languages
-- [ ] Advanced inline code processing with language detection
-- [ ] Markdown support in assignment text
-- [ ] Interactive theme customization
+Medium:
+- Highlighter token coverage
+- Execution service compile/run scenarios
+- HTML block ordering invariant tests
 
-### Phase 3: Integration & Automation
-- [ ] Integration with IDE plugins
-- [ ] Batch processing of multiple units
-- [ ] Git integration for version tracking
-- [ ] Template customization system
+Long-Term:
+- Snapshot/diff tests for HTML output stability
+- Theme fallback behavior tests
 
-### Phase 4: Advanced Features
-- [ ] Web-based interface
-- [ ] Real-time preview
-- [ ] Collaborative editing
-- [ ] Export to multiple formats (PDF, DOCX)
+## 10. Performance Considerations
 
-## Error Handling Strategy
+Expected scale is small (a handful of short Java files).  
+No optimization needed beyond O(n) line traversal for config and single-pass highlighting.
 
-- **Configuration Errors**: Provide clear error messages with suggested fixes
-- **File Not Found**: Graceful degradation with placeholder content
-- **Compilation Errors**: Include compilation output in HTML for debugging
-- **Theme Loading Errors**: Fall back to built-in default theme
+## 11. Security / Integrity
 
-## Testing Strategy
+- Local-only execution (no network I/O planned).
+- Avoid executing arbitrary external code outside controlled unit directories.
+- Provide clear authorship footer to discourage unauthorized reuse.
 
-- **Unit Tests**: Test each component in isolation
-- **Integration Tests**: Test complete workflow with sample data
-- **Theme Tests**: Validate theme loading and application
-- **Configuration Tests**: Test various configuration scenarios
+## 12. Open Technical Decisions
 
-## Dependencies
+| Topic | Decision Status |
+|-------|-----------------|
+| Theme file format | JSON vs properties (TBD) |
+| Inline code markers | Backticks vs custom delimiters (TBD) |
+| HTML tidy approach | External library vs simple formatter (TBD) |
+| Placeholder generalization | Keep explicit (<UNIT_NUMBER>) until need arises |
 
-### Current
-- Java 11+ standard library
-- No external dependencies (by design for simplicity)
+## 13. Change Log (Tech Spec)
+0.1.1 Adjusted to reflect actual minimal implementation; segregated planned components.  
+0.1 Initial aspirational specification.
 
-### Future Considerations
-- **JSON Processing**: Jackson or minimal JSON parser
-- **HTML Tidying**: JSoup for robust HTML generation
-- **Testing**: JUnit 5 for comprehensive test coverage
+## 14. Next Engineering Tasks (Actionable)
+1. Implement Stage 1 minimal HTML writer.
+2. Add existence checks for key configured paths.
+3. Introduce basic logging abstraction (or light wrapper to stdout).
+4. Create skeleton Highlighter & ThemeLoader classes (interfaces only).
+5. Add JUnit setup for Config tests.
+
+## 15. Appendix
+
+A. Minimal HTML Skeleton (planned Stage 1):
+```
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Unit <UNIT_NUMBER> Discussion Post</title>
+</head>
+<body>
+<div style="padding:10px;border:0;zoom:110%;width:600px;">
+  <h2>Discussion Post (Unit <UNIT_NUMBER>)</h2>
+  <!-- Future blocks will be injected here -->
+</div>
+</body>
+</html>
+```
+
+B. Example Future Theme Reference Shortcut:
+keyword → span style="color:#0000ff;font-weight:bold;"
+
+(End of specification)

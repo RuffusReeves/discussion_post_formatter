@@ -1,0 +1,18 @@
+{
+  "name": "tango",
+  "description": "GNOME Tango palette (light background) inspired theme",
+  "background": "#ffffff",
+  "foreground": "#2e3436",
+  "styles": {
+    "keyword": "color:#3465a4;font-weight:bold;",
+    "string": "color:#c17d11;",
+    "comment": "color:#8f5902;font-style:italic;",
+    "number": "color:#75507b;",
+    "type": "color:#4e9a06;font-weight:bold;",
+    "function": "color:#204a87;",
+    "constant": "color:#5c3566;",
+    "annotation": "color:#a40000;",
+    "operator": "color:#2e3436;",
+    "punctuation": "color:#2e3436;"
+  }
+}

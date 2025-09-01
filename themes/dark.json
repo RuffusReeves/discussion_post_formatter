@@ -1,0 +1,18 @@
+{
+  "name": "dark",
+  "description": "Neutral dark theme (VS Code inspired)",
+  "background": "#1e1e1e",
+  "foreground": "#d4d4d4",
+  "styles": {
+    "keyword": "color:#569cd6;font-weight:bold;",
+    "string": "color:#ce9178;",
+    "comment": "color:#6a9955;font-style:italic;",
+    "number": "color:#b5cea8;",
+    "type": "color:#4ec9b0;font-weight:bold;",
+    "function": "color:#dcdcaa;",
+    "constant": "color:#9cdcfe;",
+    "annotation": "color:#c586c0;",
+    "operator": "color:#d4d4d4;",
+    "punctuation": "color:#d4d4d4;"
+  }
+}

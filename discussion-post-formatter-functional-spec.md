@@ -1,117 +1,140 @@
-# Discussion Post Formatter - Functional Specification (SPEC.md)
+# Discussion Post Formatter - Functional Specification
 
 ## 1. Document Control
-1.1 Version: 0.1  
-1.2 Status: Draft  
-1.3 Owner: (Your Name)  
-1.4 Reviewers: Classmates (UoPeople CS 1102)  
-1.5 License: MIT (suggested)  
-1.6 Repository: `https://github.com/<your-user>/discussion_post_formatter`
+1.1 Version: 0.1.1  
+1.2 Status: In Progress (initial config interaction implemented; core formatting pipeline pending)  
+1.3 Owner: RuffusReeves  
+1.4 Reviewers: (Classmates / Self)  
+1.5 License: MIT (intended)  
+1.6 Repository: https://github.com/RuffusReeves/discussion_post_formatter  
 
 ## 2. Overview
-2.1 Purpose: Generate a formatted HTML discussion post (assignment text, intro, highlighted source, compiler output, program output, discussion response, references).  
-2.2 Scope: Local Java console tool reading configured file paths and producing a single HTML artifact per unit.  
-2.3 Out of Scope: Web UI, database persistence, multi-language parsing.  
-2.4 Stakeholders: Student author, peers reviewing code/output.  
-2.5 References: Course unit instructions, Java SE docs.
+2.1 Purpose: (Planned) Generate a formatted HTML discussion post consolidating assignment text, explanations, highlighted source, compiler messages, runtime output, discussion question, and references.  
+2.2 Current Scope (implemented): Interactive editing of unit and theme values with comment‑preserving configuration persistence.  
+2.3 Planned Scope: Local Java console tool reading configured file paths and producing a single HTML artifact per unit.  
+2.4 Out of Scope (current & near term): Web UI, database persistence, multi-language parsing.  
+2.5 Stakeholders: Student author (primary), peers reviewing code/output (future).  
+2.6 References: Course unit instructions, Java SE docs.
 
 ## 3. Goals
-3.1 Reduce manual formatting time.  
-3.2 Provide consistent academic presentation.  
-3.3 Enable peer review of code + output in one artifact.  
+G1 Reduce manual formatting time (NOT YET ACHIEVED).  
+G2 Provide consistent academic presentation (NOT YET ACHIEVED).  
+G3 Enable peer review in a single artifact (NOT YET ACHIEVED).  
+G4 Preserve user edits to config while retaining explanatory comments (ACHIEVED).  
 
 ## 4. System Context
-4.1 Inputs: `config.txt` + assignment/reference text files + `.java` source files.  
-4.2 Output: HTML file specified by `output_file_address`.  
-4.3 External Tools: `javac`, `java` (local JDK).  
-4.4 Constraints: Windows paths; single unit at a time.  
-4.5 Assumptions: JDK on PATH; UTF-8 text files.
+4.1 Inputs (planned): config.txt + assignment/reference/explanation text files + Java source.  
+4.2 Current Inputs: config.txt only.  
+4.3 Output (planned): HTML file at configured output path.  
+4.4 Current Output: Console diagnostic output only (no HTML generation yet).  
+4.5 External Tools (future): javac, java.  
+4.6 Constraints: Local filesystem, single unit at a time.  
+4.7 Assumptions: JDK installed; UTF‑8 files (future phases).
 
-## 5. Functional Requirements
-FR-01 Load key/value pairs from `config.txt`.  
-FR-02 Replace `{UNIT-NUMBER}` tokens in configured paths.  
-FR-03 Read assignment, intro, discussion, references, and source code files.  
-FR-04 Compile user code for the unit (wildcard pattern currently).  
-FR-05 Execute target main class (future: specify in config).  
-FR-06 Capture compiler diagnostics and runtime output.  
-FR-07 Apply simple syntax highlighting (regex) using theme rules.  
-FR-08 Assemble HTML sections in fixed order.  
-FR-09 Write final HTML to configured output path.  
-FR-10 Allow user to override assignment text via console prompt.  
-FR-11 Log (stdout) which defaults were used.  
-FR-12 Provide selectable themes (CSS rule key/value pairs).  
+## 5. Functional Requirements (Planned vs Status)
+| ID | Requirement | Status |
+|----|-------------|--------|
+| FR-01 | Load key/value pairs from config.txt (with comments & blanks preserved) | Implemented |
+| FR-02 | Replace <UNIT_NUMBER> token in configured paths at runtime | Implemented (single token) |
+| FR-03 | Read assignment, intro, discussion, references, sample code files | Pending |
+| FR-04 | Compile unit source files and capture compiler messages | Pending |
+| FR-05 | Execute target main class and capture output | Pending |
+| FR-06 | Capture & store compiler diagnostics separately from runtime output | Pending |
+| FR-07 | Apply syntax highlighting using selected theme | Pending |
+| FR-08 | Assemble ordered HTML sections | Pending |
+| FR-09 | Write final HTML to output path | Pending |
+| FR-10 | Allow console override of text block contents (persist optionally) | Pending |
+| FR-11 | Log which defaults / fallbacks were used | Pending |
+| FR-12 | Provide selectable themes (affecting highlighting CSS inline) | Partially (theme value stored only) |
 
-## 6. Improvement Backlog (Move to `WISHLIST.md` when large)
-B1 Robust glob expansion instead of single path string.  
-B2 Configurable main class (e.g. `main_class=cs_1102_base.Unit_0.Discussion_Assignment`).  
-B3 Better error segmentation (separate compiler vs runtime).  
-B4 HTML template theming (external template file).  
-B5 Safer path resolution (avoid absolute drive locking).  
-B6 Unit test suite (JUnit) for `Config`, `Utils.runAssignment`, `Highlighter`.  
-B7 Replace regex highlighter with tokenization.  
-B8 CLI flags override (`--unit`, `--theme`, `--out`).  
-B9 Export markdown alongside HTML.  
-B10 Add checksum / provenance footer (academic integrity note).
+## 6. Improvement Backlog (abridged)
+See separate backlog / wishlist (to be externalized).  
+- Multi-token support (<THEME>)  
+- Robust file discovery (no wildcards in config)  
+- CLI flag overrides (--unit, --theme, --out)  
+- Markdown / inline code parsing  
+- HTML tidy / beautifier integration  
 
-## 7. Data Model (Implicit)
-- Config Fields: unit (int), theme (string), multiple file *addresses*, derived *contents*.  
-- Derived HTML: Section blocks (assignment, intro, code, compiler, output, discussion, references).  
-- Theme Rules: key → inline CSS fragment (e.g. `keyword=color:blue;`).
+## 7. Data Model (Current / Future)
+Current:
+- Config: Ordered list of lines (ENTRY / COMMENT / BLANK) + key/value map.
+Future:
+- ContentBlock (type, content, metadata)
+- Theme model (token → inline style mapping)
+- ExecutionResult (compilerMessages[], runtimeOutput)
 
 ## 8. Interface (CLI)
-Step 1: Program start: `java -p out -m discussion_post_formatter/formatter.DiscussionPostFormatter`  
-Step 2: Prompts for assignment text (Enter to accept file).  
-Step 3: Prints status + writes HTML.
+Current Flow:
+1. Load config.txt
+2. Show current unit and theme
+3. Prompt for new unit (digits) and theme (string)
+4. Persist changes (comments preserved)
+5. Print raw vs resolved config snapshot
+
+Planned Additions:
+- Prompts for optional overrides of textual sections
+- Theme selection from enumerated themes directory
+- Summary of resolved file paths
+- Confirmation before HTML write
 
 ## 9. File Conventions
-- `config.txt`: Keys use snake\_case.  
-- Paths may include `{UNIT-NUMBER}` token.  
-- Source code path currently uses wildcard pattern (`*.java`) but passed literally to `javac` (needs expansion).  
+- config.txt: snake_case keys; angle-bracket placeholder <UNIT_NUMBER>.
+- Comments begin with # or //; preserved verbatim.
+- Future output path may embed <UNIT_NUMBER>.
 
-## 10. Non-Functional Requirements
-NFR-01 Execution Time: < 3s typical.  
-NFR-02 Portability: Should run on any JDK 17+ (avoid Windows-only assumptions).  
-NFR-03 Readability: Generated HTML must be human-readable and minimally styled inline.  
-NFR-04 Academic Integrity: No auto-answer generation; only formatting.  
-NFR-05 Reliability: Graceful messaging when files missing (no crash).
+## 10. Non-Functional Requirements (Target)
+NFR-01 Execution time < 3s typical (pending).  
+NFR-02 Portability: JDK 17+ (current code: standard Java only).  
+NFR-03 Readability: HTML pretty print (pending).  
+NFR-04 Academic Integrity: Tool formats only, no content generation (guiding principle).  
+NFR-05 Reliability: Graceful fallbacks for missing files (pending).  
 
-## 11. Error Handling
-- Missing file → Insert placeholder text + flag default used.  
-- Compilation failure → Show compiler messages section; still produce HTML.  
-- Runtime failure → Append error text in Program Output block.  
+## 11. Error Handling (Current vs Planned)
+Current:
+- Malformed config line without '=' treated as comment (silent).
+Planned:
+- Missing file → placeholder text + log
+- Compilation failure → still produce HTML with error section
+- Runtime exception → captured in Program Output section
 
 ## 12. Theming
-- Theme file: `themes/<name>.css` lines in `token=css-rule;` format.  
-- Fallback default rules applied if theme missing.  
-- Exposed tokens: `keyword`, `string`, `comment`. (Extendable.)
+Current:
+- Theme is a stored scalar value only (no expansion/no styling effect yet).
+Planned:
+- themes/<name>.json or .txt defining token → inline style fragments
+- Fallback to default if missing
+- Future placeholder <THEME> optional in paths
 
 ## 13. Security / Academic Notes
-- No network calls; file IO only.  
-- Avoid embedding secrets in config paths.  
-- Add footer: "Generated by Discussion Post Formatter – retain authorship."
+- Local file I/O only; no network operations.
+- Avoid secrets in config values.
+- Planned footer note reinforcing authorship.
 
 ## 14. Testing Strategy (Planned)
-T1 Unit: Parse `config.txt` with missing keys.  
-T2 Unit: Highlight sample code snippet.  
-T3 Integration: Simulate compilation success and failure.  
-T4 Integration: Verify HTML contains all major sections.  
-T5 Regression: Theme fallback when file absent.  
+T1 Load & preserve comments/blank lines (partially manually verified).  
+T2 Placeholder substitution test for <UNIT_NUMBER>.  
+T3 Fallback when key missing (future).  
+T4 Integration test for full HTML pipeline (future).  
 
-## 15. Risks
-R1 Hardcoded absolute Windows paths reduce portability. Mitigation: switch to relative `./data/unit_{UNIT-NUMBER}/...`.  
-R2 Wildcard compilation may fail if shell expansion unsupported. Mitigation: programmatic file enumeration.  
-R3 Incorrect class name for execution. Mitigation: add configurable `main_class`.  
+## 15. Risks (Current Relevance)
+R1 Overpromising features in docs vs code reality (mitigated by this update).  
+R2 Config token drift (<UNIT_NUMBER> vs alternative forms) — stabilized on <UNIT_NUMBER>.  
+R3 Scope creep before minimal HTML generation baseline.
 
-## 16. Open Issues
-OI-01 `InitializeVariables.java` contains invalid generic types (`Map<String, int>`).  
-OI-02 Duplicate output file handling in `Config.load` (two keys: `output_file_address` vs `output_file`).  
-OI-03 Missing getter name mismatch (`getassignmentFileAddress` called but method not defined).  
-OI-04 Syntax highlighter may wrap comment delimiters inside spans redundantly.
+## 16. Open Issues (Revalidated)
+- OI-01, OI-02 etc. from earlier draft now deferred until core formatter exists.
+- Need to identify actual current code gaps after introducing formatting classes.
 
-## 17. Change Log (Excerpt)
-0.1 Initial specification scaffold.
+## 17. Change Log
+0.1.1 Updated spec to reflect actual implemented state (config editing only).  
+0.1 Initial scaffold (aspirational feature list).
 
 ## 18. Appendix
-A1 Sample `config.txt` (redacted for brevity).  
-A2 Suggested relative layout:  
-
+A1 Current config example (excerpt):
+```
+# Core Settings
+unit = 3
+theme = default
+output_file_address = ../assignments/unit_<UNIT_NUMBER>_discussion_post.html
+```
+A2 Planned directory layout (subject to refinement).

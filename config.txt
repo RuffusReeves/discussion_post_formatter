@@ -26,7 +26,7 @@
 #
 # Core Settings
 unit = 0
-theme = default
+theme = tango
 
 # Input Text Sections
 assignment_text_file_address = ../assignments/assignment_text.txt

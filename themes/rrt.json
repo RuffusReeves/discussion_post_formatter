@@ -1,0 +1,18 @@
+{
+  "name": "rrt",
+  "description": "RRT (Pygments/TextMate style) dark palette adaptation",
+  "background": "#1a1a1a",
+  "foreground": "#dddddd",
+  "styles": {
+    "keyword": "color:#ff0007;font-weight:bold;",
+    "string": "color:#0086d2;",
+    "comment": "color:#008800;font-style:italic;",
+    "number": "color:#0086f7;",
+    "type": "color:#ff0086;font-weight:bold;",
+    "function": "color:#ff0086;font-weight:bold;",
+    "constant": "color:#ff6600;",
+    "annotation": "color:#ff0086;",
+    "operator": "color:#ffffff;",
+    "punctuation": "color:#ffffff;"
+  }
+}
