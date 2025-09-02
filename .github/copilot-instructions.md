@@ -1,3 +1,4 @@
+
 # Discussion Post Formatter
 
 Discussion Post Formatter is a Java 17+ console application for generating formatted HTML discussion posts from course assignments. Currently implements configuration management with comment preservation and placeholder resolution. The full HTML generation pipeline is planned but not yet implemented.
