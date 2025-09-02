@@ -25,7 +25,7 @@
 #   The program normalizes entry lines to: key = value
 #
 # Core Settings
-unit = 1
+unit = 2
 theme = dark
 
 # Input Text Sections
