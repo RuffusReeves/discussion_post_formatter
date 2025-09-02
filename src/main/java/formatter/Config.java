@@ -263,7 +263,7 @@ public final class Config {
                             // Log warning to stderr as per best practices
                             System.err.println("Warning: File not found or not readable: " + filePath + " (for key: " + key + ")");
                         }
-                    } catch (Exception e) {
+                    } catch (IOException | UncheckedIOException e) {
                         // Skip silently on read errors as per requirements
                         System.err.println("Warning: Failed to read file: " + filePath + " (for key: " + key + "): " + e.getMessage());
                     }
