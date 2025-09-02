@@ -25,8 +25,8 @@
 #   The program normalizes entry lines to: key = value
 #
 # Core Settings
-unit = 0
-theme = tango
+unit = 5
+theme = monokai
 
 # Input Text Sections
 assignment_text_file_address = ../assignments/assignment_text.txt
