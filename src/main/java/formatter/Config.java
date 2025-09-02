@@ -240,32 +240,37 @@ public final class Config {
      * Load file contents for keys containing "address" and store as derived values.
      * Called automatically after config loading.
      */
+    private static final Set<String> EXCLUDED_ADDRESS_KEYS = Set.of(
+            "output_file_address"   // treat this as write-only; do not load contents
+    );
+
     private void loadDerivedFileContents() {
         for (Map.Entry<String,String> entry : values.entrySet()) {
             String key = entry.getKey();
-            if (key.contains("address") && !key.equals("output_file_address")) {
+
+            // Skip excluded address keys (write-only or otherwise not to be auto-loaded)
+            if (EXCLUDED_ADDRESS_KEYS.contains(key)) {
+                continue;
+            }
+
+            if (key.contains("address")) {
                 String derivedKey = generateDerivedKey(key);
-                
-                // Skip if derived key would be empty, same as original, or already exists
+
                 if (derivedKey.isEmpty() || derivedKey.equals(key) || values.containsKey(derivedKey)) {
                     continue;
                 }
-                
-                // Resolve placeholders in the file path
+
                 String filePath = resolvePlaceholders(entry.getValue());
                 if (filePath != null) {
                     try {
-                        // Check if file exists and is readable using Utils.fileExists
                         if (Utils.fileExists(filePath)) {
                             String fileContent = Utils.readFile(filePath);
                             derivedValues.put(derivedKey, fileContent);
                         } else {
-                            // Log warning to stderr as per best practices
-                            System.err.println("Warning: File not found or not readable: " + filePath + " (for key: " + key + ")");
+                            System.out.println("Warning: File not found or not readable: " + filePath + " (for key: " + key + ")");
                         }
-                    } catch (IOException | UncheckedIOException e) {
-                        // Skip silently on read errors as per requirements
-                        System.err.println("Warning: Failed to read file: " + filePath + " (for key: " + key + "): " + e.getMessage());
+                    } catch (Exception e) {
+                        System.out.println("Warning: Failed to read file: " + filePath + " (for key: " + key + "): " + e.getMessage());
                     }
                 }
             }
