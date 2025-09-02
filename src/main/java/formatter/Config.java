@@ -260,12 +260,12 @@ public final class Config {
                             String fileContent = Utils.readFile(filePath);
                             derivedValues.put(derivedKey, fileContent);
                         } else {
-                            // Optionally log warning to stdout as specified in requirements
-                            System.out.println("Warning: File not found or not readable: " + filePath + " (for key: " + key + ")");
+                            // Log warning to stderr as per best practices
+                            System.err.println("Warning: File not found or not readable: " + filePath + " (for key: " + key + ")");
                         }
                     } catch (Exception e) {
                         // Skip silently on read errors as per requirements
-                        System.out.println("Warning: Failed to read file: " + filePath + " (for key: " + key + "): " + e.getMessage());
+                        System.err.println("Warning: Failed to read file: " + filePath + " (for key: " + key + "): " + e.getMessage());
                     }
                 }
             }
