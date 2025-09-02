@@ -243,7 +243,7 @@ public final class Config {
     private void loadDerivedFileContents() {
         for (Map.Entry<String,String> entry : values.entrySet()) {
             String key = entry.getKey();
-            if (key.contains("address")) {
+            if (key.contains("address") && !key.equals("output_file_address")) {
                 String derivedKey = generateDerivedKey(key);
                 
                 // Skip if derived key would be empty, same as original, or already exists
