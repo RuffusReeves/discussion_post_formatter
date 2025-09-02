@@ -10,14 +10,16 @@ Implemented:
 - Interactive prompt to update unit (digits) & theme (string)
 - Persist changes back to config.txt (only changed keys rewritten)
 - Resolve <UNIT_NUMBER> in paths at runtime (not written back)
+- Automatic derived file content loading: config keys containing "address" (excluding output_file_address) are automatically loaded and exposed as derived, non-persisted variables with camelCase names (e.g., assignment_text_file_address → assignmentTextFileContents)
 
 Not Yet Implemented (Planned):
-- Reading assignment / explanation / question / reference text files
 - Source file enumeration and compilation / execution
 - Syntax highlighting & theme file loading
 - HTML block construction & tidy formatting
 - Inline code detection
 - Multi-section artifact generation
+
+Note: Reading assignment/explanation/question/reference text files is now supported via automatic file content loading when their *address keys are provided in config.
 
 ## Quick Start (Current Functionality)
 
@@ -43,8 +45,26 @@ Example excerpt of `config.txt` (simplified):
 # Core Settings
 unit = 3
 theme = default
+
+# Input file addresses (automatically loaded as derived contents)
+assignment_text_file_address = ../assignments/assignment_text.txt
+code_file_address = ../assignments/code_sample.java
+
+# Final Output (excluded from automatic loading by design)
 output_file_address = ../assignments/unit_<UNIT_NUMBER>_discussion_post.html
 ```
+
+**Automatic File Content Loading:**
+- Keys containing "address" (except `output_file_address`) automatically load their file contents
+- Creates derived camelCase keys: `assignment_text_file_address` → `assignmentTextFileContents`
+- Derived values are not persisted to config.txt but available at runtime
+- `output_file_address` is excluded from loading by design as it represents output, not input
+
+**Placeholder Behavior:**
+- Only `<UNIT_NUMBER>` is resolved at runtime in file paths
+- Placeholders are resolved before attempting to load file contents
+- Derived content keys do not contain placeholders
+
 Rules:
 - Comments (# or //) and blank lines are preserved.
 - Only <UNIT_NUMBER> is resolved at runtime; no theme substitution yet.
