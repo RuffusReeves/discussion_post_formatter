@@ -46,12 +46,15 @@ public final class Config {
 
     private final List<Line> lines;                // ordered source lines
     private final LinkedHashMap<String,String> values; // maps keys to (current) values
+    private final LinkedHashMap<String,String> derivedValues; // derived file contents (not persisted)
     private final Path sourcePath;
 
     private Config(List<Line> lines, LinkedHashMap<String,String> values, Path sourcePath) {
         this.lines = lines;
         this.values = values;
+        this.derivedValues = new LinkedHashMap<>();
         this.sourcePath = sourcePath;
+        loadDerivedFileContents();
     }
 
     /* ---------- Loading ---------- */
@@ -96,7 +99,12 @@ public final class Config {
 
     /** Raw (unresolved) value */
     public String get(String key) {
-        return values.get(key);
+        // First check primary values, then derived values
+        String value = values.get(key);
+        if (value != null) {
+            return value;
+        }
+        return derivedValues.get(key);
     }
 
     /** Resolve placeholders for a single key */
@@ -226,12 +234,89 @@ public final class Config {
         return input;
     }
 
+    /* ---------- Derived file contents loading ---------- */
+
+    /**
+     * Load file contents for keys containing "address" and store as derived values.
+     * Called automatically after config loading.
+     */
+    private void loadDerivedFileContents() {
+        for (Map.Entry<String,String> entry : values.entrySet()) {
+            String key = entry.getKey();
+            if (key.contains("address")) {
+                String derivedKey = generateDerivedKey(key);
+                
+                // Skip if derived key would be empty, same as original, or already exists
+                if (derivedKey.isEmpty() || derivedKey.equals(key) || values.containsKey(derivedKey)) {
+                    continue;
+                }
+                
+                // Resolve placeholders in the file path
+                String filePath = resolvePlaceholders(entry.getValue());
+                if (filePath != null) {
+                    try {
+                        // Check if file exists and is readable using Utils.fileExists
+                        if (Utils.fileExists(filePath)) {
+                            String fileContent = Utils.readFile(filePath);
+                            derivedValues.put(derivedKey, fileContent);
+                        } else {
+                            // Log warning to stderr as per best practices
+                            System.err.println("Warning: File not found or not readable: " + filePath + " (for key: " + key + ")");
+                        }
+                    } catch (IOException | UncheckedIOException e) {
+                        // Skip silently on read errors as per requirements
+                        System.err.println("Warning: Failed to read file: " + filePath + " (for key: " + key + "): " + e.getMessage());
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Convert key from snake_case with "address" to camelCase with "contents".
+     * Example: output_file_address -> output_file_contents -> outputFileContents
+     */
+    private String generateDerivedKey(String originalKey) {
+        // Replace "address" with "contents"
+        String withContents = originalKey.replace("address", "contents");
+        
+        // Convert snake_case to camelCase
+        String[] parts = withContents.split("_");
+        if (parts.length == 1) {
+            return withContents; // No underscores, return as-is
+        }
+        
+        StringBuilder camelCase = new StringBuilder(parts[0]);
+        for (int i = 1; i < parts.length; i++) {
+            if (!parts[i].isEmpty()) {
+                camelCase.append(Character.toUpperCase(parts[i].charAt(0)));
+                if (parts[i].length() > 1) {
+                    camelCase.append(parts[i].substring(1));
+                }
+            }
+        }
+        
+        return camelCase.toString();
+    }
+
     /* ---------- Debug Strings ---------- */
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("Config (raw){\n");
         values.forEach((k,v) -> sb.append("  ").append(k).append(" = ").append(v).append('\n'));
+        
+        // Add derived values with special prefix
+        if (!derivedValues.isEmpty()) {
+            sb.append("\n  // Derived file contents (not persisted):\n");
+            derivedValues.forEach((k,v) -> {
+                String preview = v.length() > 50 ? v.substring(0, 50) + "..." : v;
+                // Replace newlines with \n for display
+                preview = preview.replace("\n", "\\n").replace("\r", "\\r");
+                sb.append("  * ").append(k).append(" = ").append(preview).append('\n');
+            });
+        }
+        
         sb.append('}');
         return sb.toString();
     }
@@ -239,6 +324,18 @@ public final class Config {
     public String toResolvedString() {
         StringBuilder sb = new StringBuilder("Config (resolved){\n");
         resolvedMap().forEach((k,v) -> sb.append("  ").append(k).append(" = ").append(v).append('\n'));
+        
+        // Add derived values with special prefix (no placeholder resolution applied to file contents)
+        if (!derivedValues.isEmpty()) {
+            sb.append("\n  // Derived file contents (not persisted):\n");
+            derivedValues.forEach((k,v) -> {
+                String preview = v.length() > 50 ? v.substring(0, 50) + "..." : v;
+                // Replace newlines with \n for display
+                preview = preview.replace("\n", "\\n").replace("\r", "\\r");
+                sb.append("  * ").append(k).append(" = ").append(preview).append('\n');
+            });
+        }
+        
         sb.append('}');
         return sb.toString();
     }

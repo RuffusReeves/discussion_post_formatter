@@ -53,3 +53,8 @@ Thumbs.db
 test-output/
 *.html
 *.xml
+
+# Test files - do not commit
+test_config.txt
+test_config_saved.txt
+test_files/
