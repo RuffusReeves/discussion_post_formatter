@@ -1,150 +1,60 @@
 # Discussion Post Formatter
 
-A Java application under development to generate formatted HTML discussion posts for course assignments.  
-Current implemented functionality is deliberately minimal: safe, comment‑preserving configuration editing (unit and theme) plus placeholder resolution for <UNIT_NUMBER>. The full formatting / compilation pipeline described in earlier drafts is not yet present.
+A Java utility to generate a self‑contained HTML “discussion post” artifact for course assignments.  
+It ingests multiple textual inputs (assignment, explanations, questions, references), highlights Java code,
+optionally compiles & runs the assignment source, and assembles everything into a single styled HTML document
+(with all styling inlined—no external CSS).
 
-## Status (2025-09-01)
+## Status (2025-09-03)
 
-Implemented:
-- Load config.txt preserving comments & blank lines
-- Interactive prompt to update unit (digits) & theme (string)
-- Persist changes back to config.txt (only changed keys rewritten)
-- Resolve <UNIT_NUMBER> in paths at runtime (not written back)
-- Automatic derived file content loading: config keys containing "address" (excluding output_file_address) are automatically loaded and exposed as derived, non-persisted variables with camelCase names (e.g., assignment_text_file_address → assignmentTextFileContents)
+### Implemented
+- Comment & blank line–preserving configuration (`config.txt`)
+- Interactive updating of `unit` (digits) and `theme` (string)
+- `<UNIT_NUMBER>` placeholder resolution at runtime (not persisted back into the file)
+- Automatic derived file content loading: any key containing `address` (except `output_file_address`)
+  is loaded into a non-persisted camelCase `...Contents` key  
+  (e.g. `assignment_text_file_address` → `assignmentTextFileContents`)
+- HTML generation for the discussion post (sections: intro, explanations, question, code, compiler messages, outputs, references)
+- Syntax highlighting of Java code via built-in `Highlighter` (theme name taken from config)
+- Inline code processing (backticks, triple backticks, `<code>` tags) via `InlineCodeProcessor`
+- Optional compilation & execution of the assignment Java source (stdout captured; minimal stderr handling)
+- Inclusion of both previously captured output file contents (if present) and fresh execution output
+- Inline-only styling (no external CSS or `<style>` blocks)
+- Basic theme JSON loading (`ThemeLoader`) for future styling integration (currently informational)
 
-Not Yet Implemented (Planned):
-- Source file enumeration and compilation / execution
-- Syntax highlighting & theme file loading
-- HTML block construction & tidy formatting
-- Inline code detection
-- Multi-section artifact generation
+### New Since Previous Update (2025-09-01 → 2025-09-03)
+- Added `Highlighter` for inline-style syntax coloring
+- Added `InlineCodeProcessor` for prose code formatting
+- Added HTML assembly in `DiscussionPostFormatter` with structured sections
+- Integrated optional compile/run step (`Utils.runJavaFile`)
+- Added execution + highlighting workflow and output file writing
+- Added helper HTML escaping & standardized section rendering
 
-Note: Reading assignment/explanation/question/reference text files is now supported via automatic file content loading when their *address keys are provided in config.
+### Not Yet Implemented (Planned)
+- CLI / flags for non-interactive mode (skip prompts, toggle execution/highlighting)
+- Structured capture & display of compilation errors (stderr panel)
+- Separate HTML builder / templating abstraction (current logic is monolithic)
+- Test suite (unit + snapshot/diff tests for HTML & tokenization)
+- Multiple placeholder types (e.g. `<THEME>`)
+- Alternate language highlighting (presently Java-only heuristic)
+- Diff / patch output mode for incremental previews
+- Performance optimization for very large source files
+- Validation & graceful degradation when required input files are missing
+- Optional markdown-to-HTML conversion for prose (currently inline code only)
 
-## Quick Start (Current Functionality)
+## Quick Start
 
 Prerequisites:
-- Java 17+ (recommended)  
-- Git (if cloning)
+- Java 17+
+- (Optional) A `themes/` directory with JSON theme descriptors (currently partially utilized)
+- `config.txt` at project root (see example below)
+- Input text files referenced by the `*_address` keys
 
-Run (example if using plain javac):
+Compile & Run (Unix-like example):
 ```bash
-javac -d out $(find src/main/java -name "*.java")
+# Compile
+find src/main/java -name "*.java" > sources.list
+javac -d out @sources.list
+
+# Run
 java -cp out formatter.DiscussionPostFormatter
-```
-
-Follow Prompts:
-1. Enter a new unit number or press Enter to keep existing.
-2. Enter a theme name or press Enter to keep existing.
-3. The tool rewrites config.txt preserving comments and shows resolved values.
-
-## Configuration (Current)
-
-Example excerpt of `config.txt` (simplified):
-```
-# Core Settings
-unit = 3
-theme = default
-
-# Input file addresses (automatically loaded as derived contents)
-assignment_text_file_address = ../assignments/assignment_text.txt
-code_file_address = ../assignments/code_sample.java
-
-# Final Output (excluded from automatic loading by design)
-output_file_address = ../assignments/unit_<UNIT_NUMBER>_discussion_post.html
-```
-
-**Automatic File Content Loading:**
-- Keys containing "address" (except `output_file_address`) automatically load their file contents
-- Creates derived camelCase keys: `assignment_text_file_address` → `assignmentTextFileContents`
-- Derived values are not persisted to config.txt but available at runtime
-- `output_file_address` is excluded from loading by design as it represents output, not input
-
-**Placeholder Behavior:**
-- Only `<UNIT_NUMBER>` is resolved at runtime in file paths
-- Placeholders are resolved before attempting to load file contents
-- Derived content keys do not contain placeholders
-
-Rules:
-- Comments (# or //) and blank lines are preserved.
-- Only <UNIT_NUMBER> is resolved at runtime; no theme substitution yet.
-- Adding a new key appends it (original order retained).
-
-## Roadmap (Next Steps)
-
-Immediate (MVP Build Path):
-1. Minimal HTML generator using existing configured file paths (even if files are placeholders).
-2. File ingestion & fallback messaging when missing.
-3. Introduce ContentBlock abstraction and HtmlAssembler.
-4. Basic Java code highlighting (regex approach) with inline styles.
-
-Later:
-- Theme loader (JSON or properties-based)
-- Compilation + runtime capture
-- Inline code snippet parsing inside explanation text
-- Question and references block integration
-- HTML tidy / pretty print
-
-## Development Notes
-
-Directory Structure (current minimal):
-```
-src/main/java/formatter/
-  Config.java
-  DiscussionPostFormatter.java
-config.txt
-```
-
-Classes Mentioned in Earlier Docs (Not Yet Added):
-- Highlighter
-- HtmlBuilder / HtmlAssembler
-- ThemeLoader
-- ContentBlock models
-These remain planned abstractions.
-
-## Contributing (Single-Developer Mode)
-
-While in early development:
-- Keep commits focused (config, formatting, future pipeline).
-- Update specs alongside new functionality to avoid drift.
-- Use feature branches only when introducing substantial new modules.
-
-Suggested Commit Types:
-- feat: for new functional capabilities (e.g., HTML output introduction)
-- refactor: internal structure changes without new behavior
-- chore: build script or documentation upkeep
-- fix: defect corrections
-
-## Testing (Planned)
-
-Initial tests will focus on:
-- Config parsing + comment preservation
-- Placeholder resolution correctness
-- Safe updating of only modified keys
-Future:
-- Highlighter token coverage
-- Compilation/execution harness
-- HTML assembly diff stability
-
-## Academic Integrity
-
-This tool formats and aggregates content; it must not fabricate assignment answers. Generated artifacts should retain clear authorship and references.
-
-## License
-
-Intended: MIT (to be added as LICENSE file once core formatter is in place).
-
-## FAQ (Early Phase)
-
-Q: Why are the specs mentioning features that don't exist yet?  
-A: They define the planned architecture. This README now distinguishes implemented vs planned to reduce confusion.
-
-Q: Can I already get HTML output?  
-A: Not yet. The next milestone adds a minimal HTML writer.
-
-Q: Will <THEME> placeholders work in paths?  
-A: Not currently. Only <UNIT_NUMBER> is implemented.
-
----
-
-(README aligned with repository’s current actual state. Update as milestones are completed.)
