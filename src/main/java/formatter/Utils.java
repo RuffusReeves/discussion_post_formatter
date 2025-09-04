@@ -5,28 +5,17 @@ import java.nio.file.*;
 
 /**
  * Utility methods for file I/O operations and Java program execution.
- * 
- * This class provides essential file operations needed by the formatter
- * and handles the compilation and execution of Java source files to
- * capture program output.
- * 
- * TODO: Add comprehensive error handling with user-friendly messages
- * TODO: Implement file encoding detection and handling
- * TODO: Add support for different compilation targets and classpath management
- * TODO: Implement timeout handling for long-running programs
+ *
+ * New:
+ *  - Added ExecutionResult record
+ *  - Added runJavaFileDetailed(...) which captures compiler messages (stderr + stdout)
+ *    separately from program runtime output.
+ *  - Original runJavaFile(...) kept for backward compatibility (now delegates).
  */
 public class Utils {
-    
+
     /**
      * Reads the entire content of a file as a string.
-     * 
-     * @param path Path to the file to read
-     * @return File content as string
-     * @throws IOException If file cannot be read
-     * 
-     * TODO: Add encoding detection and specification
-     * TODO: Implement file size limits for safety
-     * TODO: Add progress reporting for large files
      */
     public static String readFile(String path) throws IOException {
         return new String(Files.readAllBytes(Paths.get(path)));
@@ -34,129 +23,128 @@ public class Utils {
 
     /**
      * Writes content to a file, creating parent directories if needed.
-     * 
-     * @param path Path to the file to write
-     * @param content Content to write
-     * @throws IOException If file cannot be written
-     * 
-     * TODO: Add atomic write operations for safety
-     * TODO: Implement backup/versioning for existing files
-     * TODO: Add encoding specification options
      */
     public static void writeFile(String path, String content) throws IOException {
         Path filePath = Paths.get(path);
-        
-        // Create parent directories if they don't exist
         Path parentDir = filePath.getParent();
         if (parentDir != null && !Files.exists(parentDir)) {
             Files.createDirectories(parentDir);
         }
-        
         Files.write(filePath, content.getBytes());
     }
 
     /**
-     * Compiles and runs a Java source file, capturing its output.
-     * 
-     * This method performs the following steps:
-     * 1. Compiles the Java source file using javac
-     * 2. Runs the compiled class using java
-     * 3. Captures and returns the program output
-     * 
-     * @param codeFilePath Path to the Java source file
-     * @return Program output as string
-     * @throws IOException If compilation or execution fails
-     * @throws InterruptedException If process is interrupted
-     * 
-     * TODO: Add compilation error capture and formatting
-     * TODO: Implement timeout handling for infinite loops
-     * TODO: Add classpath and module path support
-     * TODO: Support for different Java versions and compiler options
-     * TODO: Implement security sandboxing for untrusted code
+     * Backward compatible helper: returns ONLY program output (or compilation failure output).
+     * Internally uses the new detailed method.
      */
     public static String runJavaFile(String codeFilePath) throws IOException, InterruptedException {
-        File file = new File(codeFilePath);
-        String dir = file.getParent();
-        String fileName = file.getName().replace(".java", "");
-
-        // Compile the Java file
-        ProcessBuilder compile = new ProcessBuilder("javac", file.getAbsolutePath());
-        compile.directory(new File(dir));
-        Process cproc = compile.start();
-        int compileResult = cproc.waitFor();
-        
-        // TODO: Capture and return compilation errors if compilation fails
-        if (compileResult != 0) {
-            try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(cproc.getErrorStream()))) {
-                StringBuilder errors = new StringBuilder();
-                String line;
-                while ((line = errorReader.readLine()) != null) {
-                    errors.append(line).append("\n");
-                }
-                return "[Compilation failed]\n" + errors.toString();
-            }
+        ExecutionResult res = runJavaFileDetailed(codeFilePath);
+        if (!res.compiled()) {
+            // If compilation failed, return compiler messages prefixed
+            return "[Compilation failed]\n" + res.compilerMessages();
         }
-
-        // Run the compiled class
-        ProcessBuilder run = new ProcessBuilder("java", fileName);
-        run.directory(new File(dir));
-        Process rproc = run.start();
-
-        // Capture output
-        StringBuilder output = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(rproc.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
-            }
-        }
-        
-        int runResult = rproc.waitFor();
-        
-        // TODO: Handle runtime errors and exit codes
-        if (runResult != 0) {
-            output.append("\n[Program exited with code ").append(runResult).append("]");
-        }
-
-        return output.toString();
+        return res.programOutput();
     }
-    
+
     /**
-     * Checks if a file exists and is readable.
-     * 
-     * @param path Path to check
-     * @return true if file exists and is readable, false otherwise
-     * 
-     * TODO: Add permission checking (write, execute)
-     * TODO: Implement file type validation
+     * Detailed execution result capturing compilation diagnostics AND program output.
+     *
+     * compilerMessages:
+     *   - All lines emitted by javac to stderr (and stdout, rarely used by javac)
+     *   - Empty String if no diagnostics
+     *
+     * programOutput:
+     *   - Stdout of the executed class (if compilation succeeded)
+     *   - Empty String if compilation failed
+     *
+     * compiled: true if javac exit code == 0
+     *
+     * Notes:
+     *  - We do NOT persist compiler messages; caller can decide how to present them.
+     *  - No timeout / sandboxing (future improvement).
+     */
+    public static ExecutionResult runJavaFileDetailed(String codeFilePath) throws IOException, InterruptedException {
+        File file = new File(codeFilePath);
+        if (!file.isFile()) {
+            return new ExecutionResult(false, "[Source file not found: " + codeFilePath + "]", "");
+        }
+        String dir = file.getParent();
+        String className = file.getName().replace(".java", "");
+
+        // 1. Compile
+        ProcessBuilder compilePB = new ProcessBuilder("javac", file.getAbsolutePath());
+        compilePB.directory(new File(dir));
+        Process compileProc = compilePB.start();
+
+        StringBuilder compilerMsgs = new StringBuilder();
+        // Capture stderr
+        try (BufferedReader err = new BufferedReader(new InputStreamReader(compileProc.getErrorStream()))) {
+            String line;
+            while ((line = err.readLine()) != null) {
+                compilerMsgs.append(line).append('\n');
+            }
+        }
+        // Capture stdout from compiler (rare, but include it)
+        try (BufferedReader out = new BufferedReader(new InputStreamReader(compileProc.getInputStream()))) {
+            String line;
+            while ((line = out.readLine()) != null) {
+                compilerMsgs.append(line).append('\n');
+            }
+        }
+
+        int compileExit = compileProc.waitFor();
+        boolean compiled = compileExit == 0;
+
+        if (!compiled) {
+            return new ExecutionResult(false, compilerMsgs.toString(), "");
+        }
+
+        // 2. Run
+        ProcessBuilder runPB = new ProcessBuilder("java", className);
+        runPB.directory(new File(dir));
+        Process runProc = runPB.start();
+
+        StringBuilder programOut = new StringBuilder();
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(runProc.getInputStream()))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                programOut.append(line).append('\n');
+            }
+        }
+        // (Optionally capture stderr of program - could append or separate. For now ignore or could add.)
+        int runExit = runProc.waitFor();
+        if (runExit != 0) {
+            programOut.append("\n[Program exited with code ").append(runExit).append("]");
+        }
+
+        return new ExecutionResult(true, compilerMsgs.toString(), programOut.toString());
+    }
+
+    /**
+     * Simple existence + readability check.
      */
     public static boolean fileExists(String path) {
-        if (path == null || path.trim().isEmpty()) {
-            return false;
-        }
-        
+        if (path == null || path.trim().isEmpty()) return false;
         Path filePath = Paths.get(path);
         return Files.exists(filePath) && Files.isReadable(filePath);
     }
-    
+
     /**
-     * Gets the file extension from a file path.
-     * 
-     * @param path File path
-     * @return File extension (without dot) or empty string if no extension
-     * 
-     * TODO: Handle complex file naming scenarios
+     * Extract file extension.
      */
     public static String getFileExtension(String path) {
-        if (path == null || path.trim().isEmpty()) {
-            return "";
-        }
-        
+        if (path == null || path.trim().isEmpty()) return "";
         int lastDot = path.lastIndexOf('.');
         if (lastDot > 0 && lastDot < path.length() - 1) {
             return path.substring(lastDot + 1);
         }
-        
         return "";
     }
+
+    /**
+     * Result container for detailed compilation + execution.
+     */
+    public record ExecutionResult(boolean compiled,
+                                  String compilerMessages,
+                                  String programOutput) { }
 }

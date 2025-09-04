@@ -6,7 +6,8 @@ import java.util.*;
 
 /**
  * Main program for assembling the discussion post HTML.
- * Updated chooseTheme() to list external JSON themes found in themes/ alongside built-ins.
+ * Now includes ephemeral (non-persisted) section "Current Compilation Messages"
+ * capturing javac diagnostics from this run.
  */
 public class DiscussionPostFormatter {
 
@@ -54,11 +55,10 @@ public class DiscussionPostFormatter {
         String activeThemeName = config.get("theme");
         Theme activeTheme = ThemeLoader.load(activeThemeName);
         if (activeTheme != null) {
-            System.out.println("Loaded theme '" + activeTheme.getName() + "' (" +
+            System.out.println("Loaded external theme '" + activeTheme.getName() + "' (" +
                     activeTheme.getStyles().size() + " style tokens)");
         } else {
-            System.out.println("Theme file not found / not parsed for '" + activeThemeName +
-                    "' (Highlighter still uses its built-in theme list).");
+            System.out.println("Using built-in palette for theme '" + activeThemeName + "'.");
         }
 
         String resolvedOutputPath = config.getResolved("output_file_address");
@@ -79,6 +79,7 @@ public class DiscussionPostFormatter {
                                                  boolean runExecution) {
         String unit = safe(config.get("unit"));
 
+        // Derived contents (previous run / static inputs)
         String assignmentText = safe(config.get("assignmentTextFileContents"));
         String introText = safe(config.get("introductionTextFileContents"));
         String explanation1 = safe(config.get("explanation1TextFileContents"));
@@ -88,9 +89,10 @@ public class DiscussionPostFormatter {
         String references = safe(config.get("referencesFileContents"));
         String sampleCode = safe(config.get("assignmentSampleCodeFileContents"));
         String codeSource = safe(config.get("codeFileContents"));
-        String compilerMessages = safe(config.get("compilerMessagesFileContents"));
-        String capturedProgramOutput = safe(config.get("programOutputFileContents"));
+        String compilerMessagesPrev = safe(config.get("compilerMessagesFileContents"));
+        String capturedProgramOutputPrev = safe(config.get("programOutputFileContents"));
 
+        // Inline code formatting
         assignmentText = InlineCodeProcessor.process(assignmentText);
         introText = InlineCodeProcessor.process(introText);
         explanation1 = InlineCodeProcessor.process(explanation1);
@@ -98,26 +100,39 @@ public class DiscussionPostFormatter {
         assignmentQuestion = InlineCodeProcessor.process(assignmentQuestion);
         discussionQuestion = InlineCodeProcessor.process(discussionQuestion);
         references = InlineCodeProcessor.process(references);
-        compilerMessages = InlineCodeProcessor.process(compilerMessages);
+        compilerMessagesPrev = InlineCodeProcessor.process(compilerMessagesPrev);
 
+        // Syntax highlight assignment code
         String highlightedAssignmentCode = codeSource.isBlank()
                 ? "(No assignment code provided.)"
                 : Highlighter.highlight(codeSource, themeName);
 
-        String freshExecutionOutput = "";
+        // Ephemeral (this run) compilation + execution
+        String currentCompilerMessagesReport;
+        String freshExecutionOutput;
         if (runExecution) {
             String resolvedCodePath = config.getResolved("code_file_address");
             if (resolvedCodePath != null && Utils.fileExists(resolvedCodePath)) {
+                Utils.ExecutionResult er;
                 try {
-                    freshExecutionOutput = Utils.runJavaFile(resolvedCodePath);
+                    er = Utils.runJavaFileDetailed(resolvedCodePath);
                 } catch (Exception e) {
-                    freshExecutionOutput = "[Execution failed] " + e.getMessage();
+                    er = new Utils.ExecutionResult(false, "[Invocation error] " + e.getMessage(), "");
                 }
+                currentCompilerMessagesReport = buildCompilerReport(er.compilerMessages(), er.compiled());
+                freshExecutionOutput = er.compiled()
+                        ? (er.programOutput().isBlank() ? "[Program produced no output]" : er.programOutput())
+                        : "[No execution due to compilation failure]";
             } else {
+                currentCompilerMessagesReport = "[Source file not found or unreadable]";
                 freshExecutionOutput = "[Code file not found or unreadable]";
             }
+        } else {
+            currentCompilerMessagesReport = "[Execution disabled]";
+            freshExecutionOutput = "[Execution skipped]";
         }
 
+        // Build HTML
         StringBuilder html = new StringBuilder(32_000);
         html.append("<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'>")
             .append("<title>Unit ").append(escape(unit)).append(" Discussion Post</title>")
@@ -152,20 +167,24 @@ public class DiscussionPostFormatter {
         html.append(sectionHeader("Assigned Code Work"))
             .append(highlightedAssignmentCode);
 
-        if (!compilerMessages.isBlank()) {
-            html.append(sectionHeader("Compiler Messages"))
-                .append(preBlock(compilerMessages));
+        // Previous (persisted) compiler messages if any
+        if (!compilerMessagesPrev.isBlank()) {
+            html.append(sectionHeader("Previously Captured Compiler Messages"))
+                .append(preBlock(compilerMessagesPrev));
         }
 
-        if (!capturedProgramOutput.isBlank()) {
+        // Current compilation (non-persisted)
+        html.append(sectionHeader("Current Compilation Messages (This Run)"))
+            .append(preBlock(currentCompilerMessagesReport));
+
+        // Previous (persisted) program output if any
+        if (!capturedProgramOutputPrev.isBlank()) {
             html.append(sectionHeader("Previously Captured Program Output"))
-                .append(preBlock(capturedProgramOutput));
+                .append(preBlock(capturedProgramOutputPrev));
         }
 
         html.append(sectionHeader("Current Execution Output"))
-            .append(preBlock(freshExecutionOutput.isBlank()
-                    ? "[No execution performed or no output]"
-                    : freshExecutionOutput));
+            .append(preBlock(freshExecutionOutput));
 
         if (!references.isBlank()) {
             html.append(sectionHeader("References"))
@@ -180,22 +199,38 @@ public class DiscussionPostFormatter {
     }
 
     /**
-     * Updated theme selection:
-     *  - Collect built-in palette names from Highlighter
-     *  - Collect external JSON theme names via ThemeLoader.listAvailableThemeNames()
-     *  - Merge (LinkedHashSet preserves insertion & removes duplicates)
-     *  - Display numbered list
+     * Build a human-friendly compiler messages report:
+     *  - If empty => "[No compiler messages]"
+     *  - Otherwise adds a summary line with counts.
+     */
+    private static String buildCompilerReport(String rawMessages, boolean compiled) {
+        if (rawMessages == null || rawMessages.isBlank()) {
+            return "[No compiler messages]";
+        }
+        // Count non-blank lines
+        String[] lines = rawMessages.split("\\R");
+        int nonBlank = 0;
+        for (String l : lines) {
+            if (!l.isBlank()) nonBlank++;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(compiled ? "[Compilation succeeded]" : "[Compilation failed]");
+        sb.append(" Diagnostics: ").append(nonBlank).append(" line");
+        if (nonBlank != 1) sb.append('s');
+        sb.append('\n').append(rawMessages.trim());
+        return sb.toString();
+    }
+
+    /**
+     * Theme selection unchanged from previous revision (external first).
      */
     private static String chooseTheme(String currentTheme) throws Exception {
         List<String> builtIns = Arrays.asList(Highlighter.availableThemes());
         List<String> external = ThemeLoader.listAvailableThemeNames();
 
         LinkedHashSet<String> merged = new LinkedHashSet<>();
-
-        // Put external first so user sees their custom themes upfront.
         merged.addAll(external);
         merged.addAll(builtIns);
-
         List<String> themeList = new ArrayList<>(merged);
 
         if (themeList.isEmpty()) {
