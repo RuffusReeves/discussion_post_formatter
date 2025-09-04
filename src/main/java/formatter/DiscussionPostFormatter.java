@@ -2,7 +2,12 @@ package formatter;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.util.*;
 
+/**
+ * Main program for assembling the discussion post HTML.
+ * Updated chooseTheme() to list external JSON themes found in themes/ alongside built-ins.
+ */
 public class DiscussionPostFormatter {
 
     public static void main(String[] args) throws Exception {
@@ -94,11 +99,7 @@ public class DiscussionPostFormatter {
         discussionQuestion = InlineCodeProcessor.process(discussionQuestion);
         references = InlineCodeProcessor.process(references);
         compilerMessages = InlineCodeProcessor.process(compilerMessages);
-/*
-        String highlightedSampleCode = sampleCode.isBlank()
-                ? "(No sample code provided.)"
-                : Highlighter.highlight(sampleCode, themeName);
-*/
+
         String highlightedAssignmentCode = codeSource.isBlank()
                 ? "(No assignment code provided.)"
                 : Highlighter.highlight(codeSource, themeName);
@@ -123,7 +124,6 @@ public class DiscussionPostFormatter {
             .append("<meta name='viewport' content='width=device-width,initial-scale=1'>")
             .append("</head><body style=\"font-family:Arial,Helvetica,sans-serif;line-height:1.5;margin:2rem;\">");
 
-        // Removed duplicate intro paragraph here
         html.append(sectionHeader("Unit " + escape(unit) + " Discussion Post"));
 
         html.append(sectionHeader("Assignment Overview"))
@@ -179,6 +179,72 @@ public class DiscussionPostFormatter {
         return html.toString();
     }
 
+    /**
+     * Updated theme selection:
+     *  - Collect built-in palette names from Highlighter
+     *  - Collect external JSON theme names via ThemeLoader.listAvailableThemeNames()
+     *  - Merge (LinkedHashSet preserves insertion & removes duplicates)
+     *  - Display numbered list
+     */
+    private static String chooseTheme(String currentTheme) throws Exception {
+        List<String> builtIns = Arrays.asList(Highlighter.availableThemes());
+        List<String> external = ThemeLoader.listAvailableThemeNames();
+
+        LinkedHashSet<String> merged = new LinkedHashSet<>();
+
+        // Put external first so user sees their custom themes upfront.
+        merged.addAll(external);
+        merged.addAll(builtIns);
+
+        List<String> themeList = new ArrayList<>(merged);
+
+        if (themeList.isEmpty()) {
+            String simple = prompt("Enter new theme (Enter to keep current '" + currentTheme + "'): ");
+            if (simple == null || simple.isBlank()) return currentTheme;
+            return simple.trim();
+        }
+
+        System.out.println("Available themes (external JSON + built-in):");
+        for (int i = 0; i < themeList.size(); i++) {
+            String name = themeList.get(i);
+            boolean isExternal = external.contains(name);
+            System.out.printf("  %2d) %s%s%s%n",
+                    i + 1,
+                    name,
+                    isExternal ? " [ext]" : "",
+                    name.equalsIgnoreCase(currentTheme) ? " (current)" : "");
+        }
+        System.out.println();
+
+        String input = prompt("Enter theme number or name (Enter to keep '" + currentTheme + "'): ");
+        if (input == null || input.isBlank()) return currentTheme;
+        input = input.trim();
+
+        if (input.matches("\\d+")) {
+            int idx = Integer.parseInt(input) - 1;
+            if (idx >= 0 && idx < themeList.size()) {
+                String chosen = themeList.get(idx);
+                System.out.println("Selected theme: " + chosen);
+                return chosen;
+            } else {
+                System.out.println("Invalid theme number; keeping current theme.");
+                return currentTheme;
+            }
+        }
+
+        for (String t : themeList) {
+            if (t.equalsIgnoreCase(input)) {
+                System.out.println("Selected theme: " + t);
+                return t;
+            }
+        }
+
+        System.out.println("No matching theme name; keeping current theme.");
+        return currentTheme;
+    }
+
+    /* ----------------- Formatting helpers ----------------- */
+
     private static String sectionHeader(String text) {
         return "<h2 style=\"margin-top:2.2rem;margin-bottom:0.6rem;font-size:1.35rem;border-bottom:1px solid #ccc;padding-bottom:0.3rem;\">" +
                 escape(text) + "</h2>";
@@ -193,13 +259,7 @@ public class DiscussionPostFormatter {
         if (htmlAlreadyProcessed == null || htmlAlreadyProcessed.isBlank()) return "";
         return "<p style=\"margin:0.9rem 0;font-style:italic;\">" + htmlAlreadyProcessed + "</p>";
     }
-/*
-    private static String blockQuote(String htmlAlreadyProcessed) {
-        if (htmlAlreadyProcessed == null || htmlAlreadyProcessed.isBlank()) return "";
-        return "<blockquote style=\"margin:1rem 1.5rem;padding:0.6rem 1rem;border-left:4px solid #888;background:#f9f9f9;\">" +
-                htmlAlreadyProcessed + "</blockquote>";
-    }
-*/
+
     private static String preBlock(String text) {
         return "<pre style=\"background:#f5f5f5;padding:0.8rem;border:1px solid #ccc;overflow:auto;font-family:'Courier New',monospace;font-size:0.85rem;line-height:1.35;\">" +
                 escape(text) + "</pre>";
@@ -221,48 +281,6 @@ public class DiscussionPostFormatter {
 
     private static String safe(String s) {
         return s == null ? "" : s;
-    }
-
-    private static String chooseTheme(String currentTheme) throws Exception {
-        var themes = java.util.List.of(Highlighter.availableThemes());
-        if (themes.isEmpty()) {
-            String simple = prompt("Enter new theme (Enter to keep current '" + currentTheme + "'): ");
-            if (simple == null || simple.isBlank()) return currentTheme;
-            return simple.trim();
-        }
-
-        System.out.println("Available (built-in) highlighter themes:");
-        for (int i = 0; i < themes.size(); i++) {
-            System.out.printf("  %d) %s%s%n", i + 1, themes.get(i),
-                    themes.get(i).equalsIgnoreCase(currentTheme) ? " (current)" : "");
-        }
-        System.out.println();
-
-        String input = prompt("Enter theme number or name (Enter to keep '" + currentTheme + "'): ");
-        if (input == null || input.isBlank()) return currentTheme;
-        input = input.trim();
-
-        if (input.matches("\\d+")) {
-            int idx = Integer.parseInt(input) - 1;
-            if (idx >= 0 && idx < themes.size()) {
-                String chosen = themes.get(idx);
-                System.out.println("Selected theme: " + chosen);
-                return chosen;
-            } else {
-                System.out.println("Invalid theme number; keeping current theme.");
-                return currentTheme;
-            }
-        }
-
-        for (String t : themes) {
-            if (t.equalsIgnoreCase(input)) {
-                System.out.println("Selected theme: " + t);
-                return t;
-            }
-        }
-
-        System.out.println("No matching theme name; keeping current theme.");
-        return currentTheme;
     }
 
     private static String prompt(String msg) throws Exception {

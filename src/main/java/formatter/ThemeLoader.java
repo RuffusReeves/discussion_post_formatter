@@ -2,27 +2,29 @@ package formatter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.nio.file.*;
+import java.util.*;
 
 /**
  * Minimal, dependency-free loader for the constrained JSON structure used by theme files.
  * NOT a general JSON parser. Assumes well-formed theme JSON.
+ *
+ * Added: listAvailableThemeNames() - scans the 'themes' directory for *.json files
+ * and returns their theme names (prefers the internal "name" field from JSON if present).
  */
 public final class ThemeLoader {
 
     private ThemeLoader() {}
 
+    /**
+     * Load a theme by name from themes/<themeName>.json
+     */
     public static Theme load(String themeName) {
         if (themeName == null || themeName.isBlank()) {
-            System.out.println("Theme name is blank.");
             return null;
         }
         Path path = Path.of("themes", themeName + ".json");
         if (!Files.isRegularFile(path)) {
-            System.out.println("Theme file not found: " + path);
             return null;
         }
         try {
@@ -37,8 +39,54 @@ public final class ThemeLoader {
         }
     }
 
+    /**
+     * Scan the themes directory for *.json files and return a list of theme names.
+     * For each file:
+     *  - Try to parse it to obtain its internal "name"
+     *  - If parsing fails or "name" missing, fall back to the filename (without extension)
+     *
+     * Order: alphabetical by theme name (case-insensitive).
+     */
+    public static List<String> listAvailableThemeNames() {
+        Path dir = Path.of("themes");
+        if (!Files.isDirectory(dir)) {
+            return List.of(); // No themes directory present
+        }
+
+        List<String> names = new ArrayList<>();
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir, "*.json")) {
+            for (Path p : ds) {
+                String baseName = stripExt(p.getFileName().toString());
+                String json;
+                try {
+                    json = Files.readString(p, StandardCharsets.UTF_8);
+                } catch (IOException ioe) {
+                    System.out.println("Skipping unreadable theme file: " + p + " (" + ioe.getMessage() + ")");
+                    continue;
+                }
+                String parsedName = null;
+                try {
+                    parsedName = extractString(json, "\"name\"");
+                } catch (Exception ignored) {
+                    // Ignore parsing errors for name field; fallback to filename
+                }
+                if (parsedName == null || parsedName.isBlank()) {
+                    parsedName = baseName;
+                }
+                names.add(parsedName);
+            }
+        } catch (IOException e) {
+            System.out.println("Theme directory scan failed: " + e.getMessage());
+        }
+
+        // Sort case-insensitively for consistent menu ordering
+        names.sort(String.CASE_INSENSITIVE_ORDER);
+        return names;
+    }
+
+    /* ----------------- Internal Parsing ----------------- */
+
     private static Theme parseTheme(String json) {
-        // Remove CR, trim
         String src = json.replace("\r", "").trim();
 
         String name = extractString(src, "\"name\"");
@@ -55,8 +103,6 @@ public final class ThemeLoader {
         Map<String,String> map = new LinkedHashMap<>();
         if (stylesJson == null || stylesJson.isBlank()) return map;
 
-        // Very naive: split on quotes around keys.
-        // Pattern: "token": "css;..."
         int idx = 0;
         while (idx < stylesJson.length()) {
             int keyStart = stylesJson.indexOf('"', idx);
@@ -80,9 +126,9 @@ public final class ThemeLoader {
     }
 
     /**
-     * Extracts a simple string value "key": "value"
+     * Extract "key": "value"
      */
-    private static String extractString(String src, String keyLiteral) {
+    static String extractString(String src, String keyLiteral) {
         int k = src.indexOf(keyLiteral);
         if (k < 0) return null;
         int colon = src.indexOf(':', k + keyLiteral.length());
@@ -95,9 +141,9 @@ public final class ThemeLoader {
     }
 
     /**
-     * Extracts the JSON object text for "key": { ... }
+     * Extract "key": { ... }
      */
-    private static String extractObject(String src, String keyLiteral) {
+    static String extractObject(String src, String keyLiteral) {
         int k = src.indexOf(keyLiteral);
         if (k < 0) return null;
         int colon = src.indexOf(':', k + keyLiteral.length());
@@ -116,5 +162,10 @@ public final class ThemeLoader {
             }
         }
         return null;
+    }
+
+    private static String stripExt(String fn) {
+        int dot = fn.lastIndexOf('.');
+        return (dot > 0) ? fn.substring(0, dot) : fn;
     }
 }
