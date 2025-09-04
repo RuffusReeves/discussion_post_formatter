@@ -6,8 +6,12 @@ import java.util.*;
 
 /**
  * Main program for assembling the discussion post HTML.
- * Now includes ephemeral (non-persisted) section "Current Compilation Messages"
- * capturing javac diagnostics from this run.
+ * Adds ephemeral (non‑persisted) reports for:
+ *  - Current compilation messages
+ *  - Current program output
+ *
+ * If there is no output from the program, we show "[No program output]".
+ * We do NOT persist the current run's program output (only display it).
  */
 public class DiscussionPostFormatter {
 
@@ -79,7 +83,7 @@ public class DiscussionPostFormatter {
                                                  boolean runExecution) {
         String unit = safe(config.get("unit"));
 
-        // Derived contents (previous run / static inputs)
+        // Previously persisted / static inputs
         String assignmentText = safe(config.get("assignmentTextFileContents"));
         String introText = safe(config.get("introductionTextFileContents"));
         String explanation1 = safe(config.get("explanation1TextFileContents"));
@@ -102,14 +106,15 @@ public class DiscussionPostFormatter {
         references = InlineCodeProcessor.process(references);
         compilerMessagesPrev = InlineCodeProcessor.process(compilerMessagesPrev);
 
-        // Syntax highlight assignment code
+        // Highlight assignment code
         String highlightedAssignmentCode = codeSource.isBlank()
                 ? "(No assignment code provided.)"
                 : Highlighter.highlight(codeSource, themeName);
 
         // Ephemeral (this run) compilation + execution
         String currentCompilerMessagesReport;
-        String freshExecutionOutput;
+        String currentProgramOutputReport;
+
         if (runExecution) {
             String resolvedCodePath = config.getResolved("code_file_address");
             if (resolvedCodePath != null && Utils.fileExists(resolvedCodePath)) {
@@ -120,16 +125,18 @@ public class DiscussionPostFormatter {
                     er = new Utils.ExecutionResult(false, "[Invocation error] " + e.getMessage(), "");
                 }
                 currentCompilerMessagesReport = buildCompilerReport(er.compilerMessages(), er.compiled());
-                freshExecutionOutput = er.compiled()
-                        ? (er.programOutput().isBlank() ? "[Program produced no output]" : er.programOutput())
-                        : "[No execution due to compilation failure]";
+                if (er.compiled()) {
+                    currentProgramOutputReport = buildProgramOutputReport(er.programOutput());
+                } else {
+                    currentProgramOutputReport = "[No program output (compilation failed)]";
+                }
             } else {
                 currentCompilerMessagesReport = "[Source file not found or unreadable]";
-                freshExecutionOutput = "[Code file not found or unreadable]";
+                currentProgramOutputReport = "[No program output (source unreadable)]";
             }
         } else {
             currentCompilerMessagesReport = "[Execution disabled]";
-            freshExecutionOutput = "[Execution skipped]";
+            currentProgramOutputReport = "[Program output collection disabled]";
         }
 
         // Build HTML
@@ -167,24 +174,25 @@ public class DiscussionPostFormatter {
         html.append(sectionHeader("Assigned Code Work"))
             .append(highlightedAssignmentCode);
 
-        // Previous (persisted) compiler messages if any
+        // Previous persisted compiler messages (if any)
         if (!compilerMessagesPrev.isBlank()) {
             html.append(sectionHeader("Previously Captured Compiler Messages"))
                 .append(preBlock(compilerMessagesPrev));
         }
 
-        // Current compilation (non-persisted)
+        // Current (ephemeral) compilation report
         html.append(sectionHeader("Current Compilation Messages (This Run)"))
             .append(preBlock(currentCompilerMessagesReport));
 
-        // Previous (persisted) program output if any
+        // Previous persisted program output (if any)
         if (!capturedProgramOutputPrev.isBlank()) {
             html.append(sectionHeader("Previously Captured Program Output"))
                 .append(preBlock(capturedProgramOutputPrev));
         }
 
-        html.append(sectionHeader("Current Execution Output"))
-            .append(preBlock(freshExecutionOutput));
+        // Current (ephemeral) program output report
+        html.append(sectionHeader("Current Program Output (This Run)"))
+            .append(preBlock(currentProgramOutputReport));
 
         if (!references.isBlank()) {
             html.append(sectionHeader("References"))
@@ -201,13 +209,12 @@ public class DiscussionPostFormatter {
     /**
      * Build a human-friendly compiler messages report:
      *  - If empty => "[No compiler messages]"
-     *  - Otherwise adds a summary line with counts.
+     *  - Else: summary line + raw messages
      */
     private static String buildCompilerReport(String rawMessages, boolean compiled) {
         if (rawMessages == null || rawMessages.isBlank()) {
             return "[No compiler messages]";
         }
-        // Count non-blank lines
         String[] lines = rawMessages.split("\\R");
         int nonBlank = 0;
         for (String l : lines) {
@@ -222,7 +229,27 @@ public class DiscussionPostFormatter {
     }
 
     /**
-     * Theme selection unchanged from previous revision (external first).
+     * Build a program output report:
+     *  - If empty => "[No program output]"
+     *  - Else summary line + raw output
+     */
+    private static String buildProgramOutputReport(String rawOutput) {
+        if (rawOutput == null || rawOutput.isBlank()) {
+            return "[No program output]";
+        }
+        String[] lines = rawOutput.split("\\R");
+        int nonBlank = 0;
+        for (String l : lines) {
+            if (!l.isBlank()) nonBlank++;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("[Program output] Lines: ").append(nonBlank).append('\n')
+          .append(rawOutput.trim());
+        return sb.toString();
+    }
+
+    /**
+     * Theme selection (external JSON first, then built-ins).
      */
     private static String chooseTheme(String currentTheme) throws Exception {
         List<String> builtIns = Arrays.asList(Highlighter.availableThemes());
