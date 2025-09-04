@@ -26,7 +26,7 @@
 #
 # Core Settings
 unit = 0
-theme = default
+theme = dark
 
 # Input Text Sections
 assignment_text_file_address = ../assignments/assignment_text.txt
@@ -44,7 +44,7 @@ program_output_file_address = ../assignments/program_output.txt
 
 # Discussion Assignment Specific Inputs
 assignment_text_for_discussion_question_file_address = ../assignments/assignment_text_for_discussion_question.txt
-discussion_question_file_address = ../assignments/dicussion_question.txt
+discussion_question_file_address = ../assignments/discussion_question.txt
 references_file_address = ../assignments/references_file_content.txt
 
 # Final Output (contains the unit token)

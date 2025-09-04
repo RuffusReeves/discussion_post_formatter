@@ -1,175 +1,149 @@
 package formatter;
 
 import java.util.*;
+//import java.util.regex.Pattern; 
 
 /**
- * Lightweight inline-style syntax highlighter producing:
- *   <pre style="..."> ... <span style="...">token</span> ... </pre>
- *
- * Constraints:
- *  - No class attributes (only inline style)
- *  - No <style> block
+ * Very lightweight Java-like syntax highlighter.
+ * Produces inline-styled HTML with <span style="..."> tokens.
+ * Uses internal palettes keyed by theme name. (Later: integrate ThemeLoader.)
  */
-public class Highlighter {
+public final class Highlighter {
 
-    private static class Theme {
-        final String background;
-        final String text;
-        final String keyword;
-        final String string;
-        final String comment;
-        final String number;
-        final String type;
+    private Highlighter() {}
 
-        Theme(String bg, String tx, String kw, String str, String cm, String num, String typeColor) {
-            this.background = bg;
-            this.text = tx;
-            this.keyword = kw;
-            this.string = str;
-            this.comment = cm;
-            this.number = num;
-            this.type = typeColor;
-        }
-    }
+    private static final Set<String> KEYWORDS = Set.of(
+            "abstract","assert","break","case","catch","class","const","continue",
+            "default","do","else","enum","extends","final","finally","for","goto",
+            "if","implements","import","instanceof","interface","native","new",
+            "package","private","protected","public","return","strictfp","static",
+            "super","switch","synchronized","this","throw","throws","transient",
+            "try","volatile","while","record","sealed","permits","var"
+    );
 
-    private static final Map<String, Theme> THEMES = new LinkedHashMap<>();
+    private static final Set<String> TYPES = Set.of(
+            "void","int","long","double","float","short","byte","char","boolean",
+            "String","Object","List","Map","Set"
+    );
+
+    private record Palette(String bg, String base, String kw, String type, String str,
+                           String comment, String num) {}
+
+    private static final Map<String,Palette> PALETTES;
     static {
-        THEMES.put("tango",   new Theme("#f8f8f8", "#2e3436", "#204a87", "#c41a16", "#8f5902", "#1c00cf", "#795da3"));
-        THEMES.put("monokai", new Theme("#272822", "#f8f8f2", "#f92672", "#e6db74", "#75715e", "#ae81ff", "#66d9ef"));
-        THEMES.put("dark",    new Theme("#000000", "#e5e5e5", "#00ccff", "#ffcc66", "#888888", "#99cc99", "#ff99ff"));
-        THEMES.put("light",   new Theme("#ffffff", "#000000", "#0000aa", "#a31515", "#008000", "#09885a", "#7b4ca3"));
-        THEMES.put("default", THEMES.get("tango"));
-    }
-
-    private static Theme pickTheme(String name) {
-        if (name == null) return THEMES.get("default");
-        return THEMES.getOrDefault(name.toLowerCase(), THEMES.get("default"));
+        Map<String,Palette> m = new LinkedHashMap<>();
+        m.put("default", new Palette("#ffffff","#222","#0000aa","#0044aa",
+                "#aa1111","#777777","#aa00aa"));
+        m.put("dark",    new Palette("#1e1e1e","#d4d4d4","#569cd6","#4fc1ff",
+                "#ce9178","#6a9955","#b5cea8"));
+        m.put("tango",   new Palette("#f8f8f8","#222","#204a87","#204a87",
+                "#c41a16","#8f5902","#5c3566"));
+        PALETTES = Collections.unmodifiableMap(m);
     }
 
     public static String[] availableThemes() {
-        return THEMES.keySet().toArray(new String[0]);
-    }
-
-    private static final Set<String> KEYWORDS = Set.of(
-            "public","private","protected","static","final","abstract","class","interface","enum",
-            "if","else","switch","case","default","for","while","do","return","new","try","catch","finally",
-            "throw","throws","extends","implements","import","package","this","super","void","break","continue",
-            "true","false","null","instanceof","var","record"
-    );
-
-    private static final Set<String> TYPE_LIKE = Set.of(
-            "String","Integer","Long","Double","Float","Short","Byte","Boolean","Character",
-            "List","Map","Set","ArrayList","HashMap","HashSet"
-    );
-
-    private enum TokenType { COMMENT, STRING, NUMBER, KEYWORD, TYPE, IDENT, SYMBOL, WHITESPACE }
-
-    private static class Token {
-        final TokenType type;
-        final String text;
-        Token(TokenType t, String txt) { this.type = t; this.text = txt; }
+        return PALETTES.keySet().toArray(new String[0]);
     }
 
     public static String highlight(String code, String themeName) {
-        Theme theme = pickTheme(themeName);
-        if (code == null) code = "";
-        String escaped = escapeHtml(code);
-        var tokens = tokenize(escaped);
+        if (code == null || code.isBlank()) return "";
+        Palette p = PALETTES.getOrDefault(themeName, PALETTES.get("default"));
 
-        StringBuilder out = new StringBuilder();
-        out.append("<pre style=\"background:")
-           .append(theme.background)
-           .append(";color:")
-           .append(theme.text)
-           .append(";padding:10px;overflow:auto;font-family:'Courier New',monospace;font-size:0.9rem;line-height:1.3;\">");
+        StringBuilder out = new StringBuilder(code.length() + 256);
+        // Simple state machine scanning
+        char[] chars = code.toCharArray();
+        int i = 0;
+        while (i < chars.length) {
+            char c = chars[i];
 
-        for (Token t : tokens) {
-            switch (t.type) {
-                case KEYWORD -> wrap(out, t.text, "color:" + theme.keyword + ";font-weight:bold;");
-                case TYPE    -> wrap(out, t.text, "color:" + theme.type + ";font-weight:bold;");
-                case STRING  -> wrap(out, t.text, "color:" + theme.string + ";");
-                case COMMENT -> wrap(out, t.text, "color:" + theme.comment + ";font-style:italic;");
-                case NUMBER  -> wrap(out, t.text, "color:" + theme.number + ";");
-                default      -> out.append(t.text);
-            }
-        }
-
-        out.append("</pre>");
-        return out.toString();
-    }
-
-    private static List<Token> tokenize(String s) {
-        List<Token> tokens = new ArrayList<>();
-        int i = 0, n = s.length();
-        while (i < n) {
-            char c = s.charAt(i);
-
-            if (Character.isWhitespace(c)) {
-                int start = i;
-                while (i < n && Character.isWhitespace(s.charAt(i))) i++;
-                tokens.add(new Token(TokenType.WHITESPACE, s.substring(start, i)));
-                continue;
-            }
-
-            if (c == '/' && i + 1 < n && s.charAt(i+1) == '*') {
+            // Line comment //
+            if (c == '/' && i + 1 < chars.length && chars[i+1] == '/') {
                 int start = i; i += 2;
-                while (i < n - 1 && !(s.charAt(i) == '*' && s.charAt(i+1) == '/')) i++;
-                if (i < n - 1) i += 2;
-                tokens.add(new Token(TokenType.COMMENT, s.substring(start, i)));
+                while (i < chars.length && chars[i] != '\n') i++;
+                appendSpan(out, code.substring(start, i), "color:"+p.comment+";font-style:italic;");
                 continue;
             }
-
-            if (c == '/' && i + 1 < n && s.charAt(i+1) == '/') {
+            // Block comment /* ... */
+            if (c == '/' && i + 1 < chars.length && chars[i+1] == '*') {
                 int start = i; i += 2;
-                while (i < n && s.charAt(i) != '\n') i++;
-                tokens.add(new Token(TokenType.COMMENT, s.substring(start, i)));
+                while (i + 1 < chars.length && !(chars[i] == '*' && chars[i+1] == '/')) i++;
+                if (i + 1 < chars.length) i += 2; // consume */
+                appendSpan(out, code.substring(start, i), "color:"+p.comment+";font-style:italic;");
                 continue;
             }
-
+            // String literal
             if (c == '"') {
-                int start = i; i++;
-                while (i < n) {
-                    char cc = s.charAt(i);
-                    if (cc == '"') { i++; break; }
-                    if (cc == '\\' && i + 1 < n) i += 2; else i++;
+                int start = i++; boolean esc = false;
+                while (i < chars.length) {
+                    char d = chars[i++];
+                    if (d == '\\' && !esc) { esc = true; continue; }
+                    if (d == '"' && !esc) break;
+                    esc = false;
                 }
-                tokens.add(new Token(TokenType.STRING, s.substring(start, i)));
+                appendSpan(out, code.substring(start, i), "color:"+p.str+";");
                 continue;
             }
-
+            // Char literal
+            if (c == '\'') {
+                int start = i++; boolean esc = false;
+                while (i < chars.length) {
+                    char d = chars[i++];
+                    if (d == '\\' && !esc) { esc = true; continue; }
+                    if (d == '\'' && !esc) break;
+                    esc = false;
+                }
+                appendSpan(out, code.substring(start, i), "color:"+p.str+";");
+                continue;
+            }
+            // Number
             if (Character.isDigit(c)) {
-                int start = i;
-                while (i < n && (Character.isDigit(s.charAt(i)) || s.charAt(i) == '.')) i++;
-                tokens.add(new Token(TokenType.NUMBER, s.substring(start, i)));
+                int start = i++;
+                while (i < chars.length && (Character.isDigit(chars[i]) || chars[i] == '.' || chars[i]=='_')) i++;
+                appendSpan(out, code.substring(start, i), "color:"+p.num+";");
                 continue;
             }
-
+            // Identifier / keyword
             if (Character.isJavaIdentifierStart(c)) {
-                int start = i; i++;
-                while (i < n && Character.isJavaIdentifierPart(s.charAt(i))) i++;
-                String ident = s.substring(start, i);
-                if (KEYWORDS.contains(ident)) tokens.add(new Token(TokenType.KEYWORD, ident));
-                else if (TYPE_LIKE.contains(ident)) tokens.add(new Token(TokenType.TYPE, ident));
-                else tokens.add(new Token(TokenType.IDENT, ident));
+                int start = i++;
+                while (i < chars.length && Character.isJavaIdentifierPart(chars[i])) i++;
+                String token = code.substring(start, i);
+                if (KEYWORDS.contains(token)) {
+                    appendSpan(out, token, "color:"+p.kw+";font-weight:bold;");
+                } else if (TYPES.contains(token)) {
+                    appendSpan(out, token, "color:"+p.type+";font-weight:bold;");
+                } else {
+                    escapeAppend(out, token);
+                }
                 continue;
             }
-
-            tokens.add(new Token(TokenType.SYMBOL, String.valueOf(c)));
+            // Fallback single char
+            escapeAppend(out, String.valueOf(c));
             i++;
         }
-        return tokens;
+
+        // Wrap in container pre
+        return "<pre style=\"background:"+p.bg+";padding:0.8rem;border:1px solid #ccc;overflow:auto;"
+                + "font-family:'Courier New',monospace;font-size:0.85rem;line-height:1.35;\">"
+                + out + "</pre>";
     }
 
-    private static void wrap(StringBuilder sb, String text, String style) {
-        sb.append("<span style=\"").append(style).append("\">").append(text).append("</span>");
+    private static void appendSpan(StringBuilder out, String raw, String style) {
+        out.append("<span style=\"").append(style).append("\">");
+        escapeAppend(out, raw);
+        out.append("</span>");
     }
 
-    private static String escapeHtml(String s) {
-        if (s == null) return "";
-        return s.replace("&","&amp;")
-                .replace("<","&lt;")
-                .replace(">","&gt;")
-                .replace("\"","&quot;")
-                .replace("'","&#39;");
+    private static void escapeAppend(StringBuilder out, String s) {
+        for (int i=0;i<s.length();i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '&' -> out.append("&amp;");
+                case '<' -> out.append("&lt;");
+                case '>' -> out.append("&gt;");
+                case '"' -> out.append("&quot;");
+                case '\'' -> out.append("&#39;");
+                default -> out.append(c);
+            }
+        }
     }
 }
