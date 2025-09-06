@@ -49,3 +49,19 @@ references_file_address = ../assignments/references_file_content.txt
 
 # Final Output (contains the unit token)
 output_file_address = ../assignments/unit_<UNIT_NUMBER>_discussion_post.html
+
+# Enable/Disable Sections (true/false)
+tidy_html = true
+tidy_debug = true
+include_assignment_text = true
+include_sample_code = true
+include_introduction = true
+include_explanation1 = true
+include_explanation2 = true
+include_code_listing = true
+include_compiler_messages = true
+include_program_output = true
+include_assignment_text_for_discussion_question = true
+include_discussion_question = true
+include_references = true
+

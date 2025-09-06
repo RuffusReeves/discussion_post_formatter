@@ -1,394 +1,241 @@
+// Filename: Config.java
+
 package formatter;
 
-import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.io.Writer;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
 import java.util.*;
 
 /**
- * Config
- * ------
- * This class loads and manages the settings in config.txt.
- * Goals:
- *  - Keep original comments and blank lines (so file stays readable).
- *  - Let you read and update key=value pairs.
- *  - Replace <UNIT_NUMBER> only when a resolved value is requested
- *    (we do NOT rewrite the token inside config.txt).
- *  - Automatically load file contents for keys that contain "address"
- *    (except output_file_address) and expose them as derived values.
+ * Configuration loader/persister.
  *
- * Terms:
- *  "raw value"  = exactly what is in the file
- *  "resolved"   = same value but with <UNIT_NUMBER> replaced
- *  "derived"    = extra in-memory values created from reading files
+ * Features:
+ *  - Preserves comments and blank lines.
+ *  - Resolves <UNIT_NUMBER> token.
+ *  - Loads the contents of every key ending with _file_address into a derived key
+ *    whose name ends with FileContents (camelCase conversion).
+ *  - Resolves relative paths against the directory that contains config.txt
+ *    (improves portability vs depending on current working directory).
  *
- * You DO NOT need to understand every detail right away—focus first
- * on how load(), get(), set(), and save() work.
+ * Enhancement:
+ *  - Missing or unreadable file paths now produce diagnostic markers instead of silent "".
  */
 public final class Config {
 
-    /* ---------- Internal line model ---------- */
-    // We classify each line in the config file so we can write it back
-    // exactly (with the same comments and spacing).
-    private enum LineType { ENTRY, COMMENT, BLANK }
-
-    /**
-     * Represents one line from config.txt.
-     * For ENTRY lines we store the key and value separately.
-     * For COMMENT and BLANK lines we just keep the original text.
-     */
-    private static final class Line {
-    	// Declare the Fields.
-        LineType type;
-        String key;     // for ENTRY
-        String value;   // for ENTRY
-        String text;    // original comment line text or "" for blank
-
-        Line(LineType type, String key, String value, String text) {
-            this.type = type;
-            this.key = key;
-            this.value = value;
-            this.text = text;
-        }
-        static Line entry(String key, String value) { return new Line(LineType.ENTRY, key, value, null); }
-        static Line comment(String text) { return new Line(LineType.COMMENT, null, null, text); }
-        static Line blank() { return new Line(LineType.BLANK, null, null, ""); }
+    private interface Line { String raw(); }
+    private record CommentLine(String raw) implements Line {}
+    private record BlankLine(String raw) implements Line {}
+    private record EntryLine(String key, String value, String rawPrefix, String rawSuffix) implements Line {
+        @Override public String raw() { return rawPrefix + key + " = " + value + rawSuffix; }
     }
 
-    // lines keeps the order and spacing of the original file.
     private final List<Line> lines;
-    // values maps keys (like "unit") to their raw string value.
     private final LinkedHashMap<String,String> values;
-    // derivedValues holds file contents loaded based on "*address" keys.
     private final LinkedHashMap<String,String> derivedValues;
-    // Where the file came from (used when saving).
     private final Path sourcePath;
+    private final Path configDir;
 
-    private Config(List<Line> lines, LinkedHashMap<String,String> values, Path sourcePath) {
+    private static final String MISSING_PREFIX = "[MISSING FILE:";
+    private static final String UNREADABLE_PREFIX = "[UNREADABLE FILE:";
+
+    private Config(List<Line> lines,
+                   LinkedHashMap<String,String> values,
+                   Path sourcePath) {
         this.lines = lines;
         this.values = values;
         this.derivedValues = new LinkedHashMap<>();
         this.sourcePath = sourcePath;
-        // Load extra contents right after reading the config file.
+        this.configDir = sourcePath.toAbsolutePath().getParent();
         loadDerivedFileContents();
     }
 
-    /* ---------- Loading ---------- */
+    /* ------------ Loading / Reloading ------------ */
 
-    /**
-     * Load config from a string path helper method.
-     */
-    public static Config load(String path) throws IOException {
-        return load(Path.of(path));
+    public static Config load(String configFileName) throws IOException {
+        Path p = Paths.get(configFileName).toAbsolutePath().normalize();
+        if (!Files.isRegularFile(p)) {
+            throw new FileNotFoundException("Config file not found: " + p);
+        }
+        List<String> rawLines = Files.readAllLines(p, StandardCharsets.UTF_8);
+        List<Line> parsed = new ArrayList<>(rawLines.size());
+        LinkedHashMap<String,String> kv = new LinkedHashMap<>();
+
+        for (String raw : rawLines) {
+            if (raw.trim().isEmpty()) {
+                parsed.add(new BlankLine(raw));
+                continue;
+            }
+            if (raw.trim().startsWith("#")) {
+                parsed.add(new CommentLine(raw));
+                continue;
+            }
+            int eq = raw.indexOf('=');
+            if (eq < 0) {
+                parsed.add(new CommentLine(raw));
+                continue;
+            }
+            String left = raw.substring(0, eq).trim();
+            String right = raw.substring(eq + 1).trim();
+            kv.put(left, right);
+            parsed.add(new EntryLine(left, right, "", ""));
+        }
+
+        return new Config(parsed, kv, p);
     }
 
-    /**
-     * Load config from a Path.
-     * Reads the file line by line, classifies each line, and stores key/value pairs.
-     */
-    public static Config load(Path path) throws IOException {
-        List<Line> lines = new ArrayList<>();
-        LinkedHashMap<String,String> map = new LinkedHashMap<>();
+    public Config reload() throws IOException {
+        return load(sourcePath.toString());
+    }
 
-        try (BufferedReader br = Files.newBufferedReader(path)) {
-            String rawLine;
-            while ((rawLine = br.readLine()) != null) {
-                String trimmed = rawLine.trim();
+    /* ------------ Getters / Mutation ------------ */
 
-                // Blank line
-                if (trimmed.isEmpty()) {
-                    lines.add(Line.blank());
-                    continue;
-                }
-                // Comment line (starts with # or //)
-                if (trimmed.startsWith("#") || trimmed.startsWith("//")) {
-                    lines.add(Line.comment(rawLine));
-                    continue;
-                }
-                // If there's no '=', treat as a comment to avoid losing it.
-                int eq = rawLine.indexOf('=');
-                if (eq < 0) {
-                    lines.add(Line.comment(rawLine));
-                    continue;
-                }
+    public String get(String key) {
+        return values.get(key);
+    }
 
-                // Split into key = value (everything after first '=' belongs to value)
-                String left = rawLine.substring(0, eq).trim();
-                String right = rawLine.substring(eq + 1).trim();
-
-                map.put(left, right);
-                lines.add(Line.entry(left, right));
+    public void set(String key, String value) {
+        boolean updated = false;
+        for (int i=0; i<lines.size(); i++) {
+            Line ln = lines.get(i);
+            if (ln instanceof EntryLine el && el.key().equals(key)) {
+                lines.set(i, new EntryLine(key, value, el.rawPrefix(), el.rawSuffix()));
+                updated = true;
+                break;
             }
         }
-        return new Config(lines, map, path);
+        if (!updated) {
+            lines.add(new EntryLine(key, value, "", ""));
+        }
+        values.put(key, value);
     }
 
-    /* ---------- Accessors ---------- */
-
-    /**
-     * Returns the raw (unresolved) value for a key OR a derived value.
-     * Example: get("unit") -> "3"
-     */
-    public String get(String key) {
-        String value = values.get(key);
-        if (value != null) return value;
-        return derivedValues.get(key); // fallback to derived (like assignmentTextFileContents)
+    public Path getConfigDir() {
+        return configDir;
     }
 
-    /**
-     * Returns the value with placeholders replaced.
-     * Currently only <UNIT_NUMBER>.
-     */
     public String getResolved(String key) {
-        String raw = get(key);
+        String raw = values.get(key);
         if (raw == null) return null;
         return resolvePlaceholders(raw);
     }
 
     /**
-     * Returns a read-only view of the original key/value pairs.
-     * (Derived values are not included here.)
+     * Access to derived loaded file contents (the key is the camelCase + FileContents).
+     * May now contain diagnostic markers such as:
+     *   [MISSING FILE:<absolutePath>]
+     *   [UNREADABLE FILE:<absolutePath>] <message>
      */
-    public Map<String,String> asRawMap() {
+    public String get(String key, boolean derived) {
+        return derived ? derivedValues.get(key) : values.get(key);
+    }
+
+    public Map<String,String> rawValues() {
         return Collections.unmodifiableMap(values);
     }
 
-    /**
-     * Returns a new map with all placeholders resolved.
-     */
-    public Map<String,String> resolvedMap() {
-        LinkedHashMap<String,String> out = new LinkedHashMap<>();
-        for (Map.Entry<String,String> e : values.entrySet()) {
-            out.put(e.getKey(), resolvePlaceholders(e.getValue()));
-        }
-        return Collections.unmodifiableMap(out);
+    public Map<String,String> derivedValues() {
+        return Collections.unmodifiableMap(derivedValues);
     }
 
-    /* ---------- Mutation ---------- */
-
-    /**
-     * Sets or updates a key.
-     * If value == null we "remove" it by converting its line to a comment (soft delete).
-     * New keys are appended at the end (with a blank line separator for readability).
-     */
-    public void set(String key, String value) {
-        if (key == null || key.isBlank()) {
-            throw new IllegalArgumentException("Key must not be null/blank");
-        }
-
-        Line existing = null;
-        for (Line line : lines) {
-            if (line.type == LineType.ENTRY && line.key.equals(key)) {
-                existing = line;
-                break;
-            }
-        }
-
-        if (value == null) {
-            // Remove case: convert to a comment so we don't lose history.
-            values.remove(key);
-            if (existing != null) {
-                existing.type = LineType.COMMENT;
-                existing.text = "# (removed) " + existing.key + " = " + existing.value;
-                existing.key = null;
-                existing.value = null;
-            }
-            return;
-        }
-
-        if (existing != null) {
-            // Update existing entry.
-            existing.value = value;
-            values.put(key, value);
-        } else {
-            // Add new key at end. Insert a blank line first if last line was content.
-            if (!lines.isEmpty()) {
-                Line last = lines.get(lines.size() - 1);
-                if (last.type == LineType.ENTRY || last.type == LineType.COMMENT) {
-                    lines.add(Line.blank());
-                }
-            }
-            Line line = Line.entry(key, value);
-            lines.add(line);
-            values.put(key, value);
-        }
-    }
-
-    /* ---------- Save / Reload ---------- */
-
-    /**
-     * Saves back to the original file path.
-     */
     public void save() throws IOException {
-        if (sourcePath == null) {
-            throw new IllegalStateException("No sourcePath; use save(Path) instead.");
+        try (BufferedWriter bw = Files.newBufferedWriter(sourcePath, StandardCharsets.UTF_8)) {
+            for (Line l : lines) {
+                bw.write(l.raw());
+                bw.newLine();
+            }
         }
-        save(sourcePath);
     }
 
-    /**
-     * Saves to a specific file path.
-     * Rebuilds each line based on its type while keeping comments / blanks.
-     */
-    public void save(Path path) throws IOException {
-        try (Writer w = Files.newBufferedWriter(path)) {
-            for (Line line : lines) {
-                switch (line.type) {
-                    case BLANK -> w.write(System.lineSeparator());
-                    case COMMENT -> {
-                        w.write(line.text);
-                        w.write(System.lineSeparator());
-                    }
-                    case ENTRY -> {
-                        w.write(line.key + " = " + (line.value == null ? "" : line.value));
-                        w.write(System.lineSeparator());
-                    }
+    @Override
+    public String toString() {
+        return "# Raw Values\n" + values;
+    }
+
+    public String toResolvedString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("# Resolved Values").append(System.lineSeparator());
+        for (String k : values.keySet()) {
+            sb.append(k).append(" = ").append(getResolved(k)).append(System.lineSeparator());
+        }
+        return sb.toString();
+    }
+
+    /* ------------ Diagnostic Helpers ------------ */
+
+    public static boolean isMissingMarker(String s) {
+        return s != null && s.startsWith(MISSING_PREFIX);
+    }
+    public static boolean isUnreadableMarker(String s) {
+        return s != null && s.startsWith(UNREADABLE_PREFIX);
+    }
+
+    /* ------------ Internal Helpers ------------ */
+
+    private void loadDerivedFileContents() {
+        for (Map.Entry<String,String> entry : values.entrySet()) {
+            String key = entry.getKey();
+            if (!key.endsWith("_file_address")) continue;
+
+            String substituted = resolvePlaceholders(entry.getValue());
+            if (substituted == null || substituted.isBlank()) continue;
+
+            Path resolvedPath = resolvePath(substituted);
+            String contentKey = toContentKey(key);
+
+            if (resolvedPath != null && Files.isRegularFile(resolvedPath) && Files.isReadable(resolvedPath)) {
+                try {
+                    String fileData = Files.readString(resolvedPath, StandardCharsets.UTF_8);
+                    derivedValues.put(contentKey, fileData);
+                } catch (IOException ioe) {
+                    derivedValues.put(contentKey,
+                            UNREADABLE_PREFIX + resolvedPath.toAbsolutePath() + "] " + ioe.getMessage());
+                }
+            } else {
+                if (resolvedPath != null && !Files.exists(resolvedPath)) {
+                    derivedValues.put(contentKey,
+                            MISSING_PREFIX + resolvedPath.toAbsolutePath() + "]");
+                } else {
+                    // Exists but not readable or not a regular file
+                    derivedValues.put(contentKey,
+                            UNREADABLE_PREFIX + resolvedPath.toAbsolutePath() + "] Not a readable regular file");
                 }
             }
         }
     }
 
-    /**
-     * Discards current in-memory data and reloads from disk.
-     */
-    public Config reload() {
-        if (sourcePath == null) throw new IllegalStateException("No sourcePath to reload.");
-        try {
-            return load(sourcePath);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to reload " + sourcePath, e);
+    private Path resolvePath(String pathString) {
+        Path p = Paths.get(pathString);
+        if (!p.isAbsolute()) {
+            p = configDir.resolve(pathString);
         }
+        return p.normalize();
     }
 
-    public Path getSourcePath() {
-        return sourcePath;
+    private String toContentKey(String fileAddressKey) {
+        String base = fileAddressKey.substring(0, fileAddressKey.length() - "_file_address".length());
+        String[] parts = base.split("_");
+        StringBuilder sb = new StringBuilder();
+        for (int i=0;i<parts.length;i++) {
+            String part = parts[i];
+            if (i==0) {
+                sb.append(part);
+            } else {
+                sb.append(part.substring(0,1).toUpperCase()).append(part.substring(1));
+            }
+        }
+        sb.append("FileContents");
+        return sb.toString();
     }
 
-    /* ---------- Placeholder resolution ---------- */
-
-    /**
-     * Replace runtime tokens like <UNIT_NUMBER> in a string value.
-     * (We only add more tokens if we intentionally support them.)
-     */
     private String resolvePlaceholders(String input) {
         if (input == null) return null;
         if (input.contains("<UNIT_NUMBER>")) {
             String unit = values.get("unit");
-            if (unit != null) {
-                input = input.replace("<UNIT_NUMBER>", unit);
-            }
+            if (unit != null) input = input.replace("<UNIT_NUMBER>", unit);
         }
         return input;
-    }
-
-    /* ---------- Derived file contents loading ---------- */
-
-    /**
-     * These keys are NOT loaded as file contents even if they contain 'address'.
-     * For example, output_file_address points to an output file we will WRITE,
-     * not something we want to read into memory.
-     */
-    private static final Set<String> EXCLUDED_ADDRESS_KEYS = Set.of(
-            "output_file_address"
-    );
-
-    /**
-     * Auto-load each file referenced by keys containing "address" (broad rule).
-     * Then store the content under a camelCase "contents" key.
-     * Example: assignment_text_file_address -> assignmentTextFileContents
-     */
-    private void loadDerivedFileContents() {
-        for (Map.Entry<String,String> entry : values.entrySet()) {
-            String key = entry.getKey();
-
-            if (EXCLUDED_ADDRESS_KEYS.contains(key)) {
-                continue; // skip output path
-            }
-
-            if (key.contains("address")) {
-                String derivedKey = generateDerivedKey(key);
-
-                // Avoid overwriting or weird empty names.
-                if (derivedKey.isEmpty() || derivedKey.equals(key) || values.containsKey(derivedKey)) {
-                    continue;
-                }
-
-                String filePath = resolvePlaceholders(entry.getValue());
-                if (filePath != null) {
-                    try {
-                        if (Utils.fileExists(filePath)) {
-                            String fileContent = Utils.readFile(filePath);
-                            derivedValues.put(derivedKey, fileContent);
-                        } else {
-                            System.out.println("Warning: File not found: " + filePath + " (key: " + key + ")");
-                        }
-                    } catch (Exception e) {
-                        System.out.println("Warning: Could not read: " + filePath + " (key: " + key + "): " + e.getMessage());
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Turns original key into a derived camelCase key replacing 'address' with 'contents'.
-     * Example: my_file_address -> myFileContents
-     */
-    private String generateDerivedKey(String originalKey) {
-        String withContents = originalKey.replace("address", "contents");
-        String[] parts = withContents.split("_");
-        if (parts.length == 1) return withContents;
-
-        StringBuilder camelCase = new StringBuilder(parts[0]);
-        for (int i = 1; i < parts.length; i++) {
-            if (!parts[i].isEmpty()) {
-                camelCase.append(Character.toUpperCase(parts[i].charAt(0)));
-                if (parts[i].length() > 1) {
-                    camelCase.append(parts[i].substring(1));
-                }
-            }
-        }
-        return camelCase.toString();
-    }
-
-    /* ---------- Debug Strings ---------- */
-
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder("Config (raw){\n");
-        values.forEach((k,v) -> sb.append("  ").append(k).append(" = ").append(v).append('\n'));
-
-        if (!derivedValues.isEmpty()) {
-            sb.append("\n  // Derived file contents (not persisted):\n");
-            derivedValues.forEach((k,v) -> {
-                String preview = v.length() > 50 ? v.substring(0, 50) + "..." : v;
-                preview = preview.replace("\n", "\\n").replace("\r", "\\r");
-                sb.append("  * ").append(k).append(" = ").append(preview).append('\n');
-            });
-        }
-        sb.append('}');
-        return sb.toString();
-    }
-
-    /**
-     * Same as toString() but shows resolved (placeholder-substituted) values.
-     */
-    public String toResolvedString() {
-        StringBuilder sb = new StringBuilder("Config (resolved){\n");
-        resolvedMap().forEach((k,v) -> sb.append("  ").append(k).append(" = ").append(v).append('\n'));
-
-        if (!derivedValues.isEmpty()) {
-            sb.append("\n  // Derived file contents (not persisted):\n");
-            derivedValues.forEach((k,v) -> {
-                String preview = v.length() > 50 ? v.substring(0, 50) + "..." : v;
-                preview = preview.replace("\n", "\\n").replace("\r", "\\r");
-                sb.append("  * ").append(k).append(" = ").append(preview).append('\n');
-            });
-        }
-        sb.append('}');
-        return sb.toString();
     }
 }

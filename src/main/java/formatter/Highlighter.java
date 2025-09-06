@@ -1,3 +1,5 @@
+// Current filename: Highlighter.java
+
 package formatter;
 
 import java.util.*;
