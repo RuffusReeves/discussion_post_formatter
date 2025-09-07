@@ -150,10 +150,12 @@ public class DiscussionPostFormatter {
         }
 
         StringBuilder html = new StringBuilder(32_000);
+        // OPEN: add <main> wrapper
         html.append("<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'>")
             .append("<title>Unit ").append(escape(unit)).append(" Discussion Post</title>")
             .append("<meta name='viewport' content='width=device-width,initial-scale=1'>")
-            .append("</head><body style=\"font-family:Arial,Helvetica,sans-serif;line-height:1.5;margin:2rem;\">");
+            .append("</head><body style=\"font-family:Arial,Helvetica,sans-serif;line-height:1.5;margin:2rem;\">")
+            .append("<main style='display:block;width:100%;max-width:960px;margin:0 auto;'>");
 
         html.append(sectionHeader("Unit " + escape(unit) + " Discussion Post"));
 
@@ -219,8 +221,12 @@ public class DiscussionPostFormatter {
         // References
         appendConditionalSection(html, config, "include_references", "References", references, false);
 
-        html.append("<hr style='margin:2rem 0;'>")
-            .append("<p style='font-size:0.8rem;color:#666;'>Generated automatically by DiscussionPostFormatter.</p>")
+        // CLOSE: footer + close </main>
+        html.append("<footer style='margin-top:3rem;font-size:0.7rem;color:#555;opacity:0.85;text-align:center;'>")
+            .append("<!-- assembler: v2025-09-07 | Formatted by Jemz using Discussion Post Formatter -->")
+            .append(" | Created by RuffusReeves with the assistance of GitHub Copilot")
+            .append("</footer>")
+            .append("</main>")
             .append("</body></html>");
 
         return html.toString();
@@ -382,28 +388,47 @@ public class DiscussionPostFormatter {
         return currentTheme;
     }
 
-    /* -------- HTML helpers (unchanged except reuse) -------- */
+    /* -------- HTML helpers (block-aware) -------- */
 
     private static String sectionHeader(String text) {
         return "<h2 style=\"margin-top:2.2rem;margin-bottom:0.6rem;font-size:1.35rem;border-bottom:1px solid #ccc;padding-bottom:0.3rem;\">" +
                 escape(text) + "</h2>";
     }
+
+    private static boolean containsBlockHtml(String html) {
+        if (html == null) return false;
+        String s = html;
+        // Common block-level tags; case-insensitive
+        return s.matches("(?is).*<\\s*(div|p|h[1-6]|ul|ol|li|pre|section|article|header|footer|nav|table|thead|tbody|tr|td|th|blockquote|figure|figcaption)\\b.*");
+    }
+
     private static String paragraph(String htmlAlreadyProcessed) {
         if (htmlAlreadyProcessed == null || htmlAlreadyProcessed.isBlank()) return "";
-        return "<p style=\"margin:0.9rem 0;\">" + htmlAlreadyProcessed + "</p>";
+        if (containsBlockHtml(htmlAlreadyProcessed)) {
+            // Avoid invalid nesting: don't put blocks inside <p>
+            return "<div style='margin:0.9rem 0;'>" + htmlAlreadyProcessed + "</div>";
+        }
+        return "<p style='margin:0.9rem 0;'>" + htmlAlreadyProcessed + "</p>";
     }
+
     private static String italic(String htmlAlreadyProcessed) {
         if (htmlAlreadyProcessed == null || htmlAlreadyProcessed.isBlank()) return "";
-        return "<p style=\"margin:0.9rem 0;font-style:italic;\">" + htmlAlreadyProcessed + "</p>";
+        if (containsBlockHtml(htmlAlreadyProcessed)) {
+            return "<div style='margin:0.9rem 0;font-style:italic;'>" + htmlAlreadyProcessed + "</div>";
+        }
+        return "<p style='margin:0.9rem 0;font-style:italic;'>" + htmlAlreadyProcessed + "</p>";
     }
+
     private static String preBlock(String text) {
-        return "<pre style=\"background:#f5f5f5;padding:0.8rem;border:1px solid #ccc;overflow:auto;font-family:'Courier New',monospace;font-size:0.85rem;line-height:1.35;white-space:pre-wrap;\">" +
-                escape(text) + "</pre>";
+        return "<pre style=\"background:#f5f5f5;padding:0.8rem;border:1px solid #ccc;overflow:auto;font-family:'Courier New',monospace;font-size:0.85rem;line-height:1.35;white-space:pre-wrap;\">"
+                + escape(text) + "</pre>";
     }
+
     private static String italicPreBlock(String text) {
-        return "<pre style=\"background:#f5f5f5;padding:0.8rem;border:1px solid #ccc;overflow:auto;font-style:italic;font-family:'Courier New',monospace;font-size:0.85rem;line-height:1.35;white-space:pre-wrap;\">" +
-                escape(text) + "</pre>";
+        return "<pre style=\"background:#f5f5f5;padding:0.8rem;border:1px solid #ccc;overflow:auto;font-style:italic;font-family:'Courier New',monospace;font-size:0.85rem;line-height:1.35;white-space:pre-wrap;\">"
+                + escape(text) + "</pre>";
     }
+
     private static String escape(String s) {
         if (s == null) return "";
         return s.replace("&","&amp;")
@@ -412,9 +437,11 @@ public class DiscussionPostFormatter {
                 .replace("\"","&quot;")
                 .replace("'","&#39;");
     }
+
     private static String safe(String s) {
         return s == null ? "" : s;
     }
+
     private static String prompt(String msg) throws Exception {
         System.out.print(msg);
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));

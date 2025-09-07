@@ -1,5 +1,3 @@
-// Current filename: HtmlAssembler.java
-
 package formatter;
 
 import java.util.List;
@@ -31,11 +29,11 @@ public class HtmlAssembler {
 
     public static String assemble(String unit, List<ContentBlock> blocks) {
         StringBuilder sb = new StringBuilder();
-        sb.append("<!DOCTYPE html5>\n<html lang=\"en\">")
+        sb.append("<!DOCTYPE html>\n<html lang=\"en\">")
           .append("\n<head>")
           .append("\n\t<meta charset=\"UTF-8\" />")
           .append("\n\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />")
-          .append("\n\t<title>Discussion Post Unit ") .append(unit)  .append("</title>")
+          .append("\n\t<title>Discussion Post Unit ").append(unit).append("</title>")
           .append("\n\t<meta name=\"author\" content=\"Joe Reeves\" />")
           .append("\n</head>\n")
           .append("\n\n<body style=\"").append(BODY_STYLE).append("\">")
@@ -46,8 +44,8 @@ public class HtmlAssembler {
         }
 
         sb.append("\n\t<footer style=\"").append(FOOTER_STYLE).append("\">")
-          .append("<!-- Formatted by Jemz using Discussion Post Formatter -->")
-          .append(" | Created by RuffusReeves with the assistance of Github Copilot using GPT-5")
+          .append("<!-- assembler: v2025-09-07 | Formatted by Jemz using Discussion Post Formatter -->")
+          .append(" | Created by RuffusReeves with the assistance of GitHub Copilot")
           .append("\n\t</footer>")
           .append("\n\t</main>")
           .append("\n\n</body>")

@@ -64,6 +64,6 @@ include_explanation1 = false
 include_explanation2 = false
 include_assignment_text_for_discussion_question = false
 include_discussion_question = false
-tidy_html = false
+tidy_html = true
 tidy_debug = true
 

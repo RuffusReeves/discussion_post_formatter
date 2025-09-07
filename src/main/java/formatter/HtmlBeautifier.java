@@ -1,5 +1,3 @@
-// Current filename: HtmlBeautifier.java
-
 package formatter;
 
 import java.io.*;
@@ -41,6 +39,9 @@ public final class HtmlBeautifier {
         try {
             String tidyPath = findTidyExecutable();
             if (tidyPath != null) {
+                if (debug) {
+                    System.out.println("[HtmlBeautifier] Using external tidy: " + tidyPath);
+                }
                 TidyResult tr = runExternalTidy(tidyPath, rawHtml);
                 if (tr != null && tr.output() != null && !tr.output().isBlank()) {
                     String output = tr.output();
@@ -121,7 +122,11 @@ public final class HtmlBeautifier {
                 "--vertical-space", "yes",
                 "--tidy-mark", "no",
                 "--drop-empty-elements", "no",
-                "--preserve-entities", "yes"
+                "--preserve-entities", "yes",
+                // Ensure HTML5 parsing so modern sectioning tags are preserved
+                "--doctype", "html5",
+                // Be explicit about HTML5 sectioning elements as block-level
+                "--new-blocklevel-tags", "main,section,article,header,footer,nav"
         );
         Process proc = pb.start();
         try (OutputStream os = proc.getOutputStream()) {
