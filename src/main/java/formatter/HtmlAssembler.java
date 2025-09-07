@@ -31,7 +31,7 @@ public class HtmlAssembler {
 
     public static String assemble(String unit, List<ContentBlock> blocks) {
         StringBuilder sb = new StringBuilder();
-        sb.append("<!DOCTYPE html>\n<html lang=\"en\">")
+        sb.append("<!DOCTYPE html5>\n<html lang=\"en\">")
           .append("\n<head>")
           .append("\n\t<meta charset=\"UTF-8\" />")
           .append("\n\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />")

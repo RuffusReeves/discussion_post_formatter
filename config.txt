@@ -31,26 +31,26 @@ unit = 1
 theme = light
 
 # Input Text Sections
-assignment_text_file_address = ../assignments/assignment_text.txt
-assignment_sample_code_file_address = ../assignments/assignment_sample_code.txt
-introduction_text_file_address = ../assignments/introduction.txt
-explanation1_text_file_address = ../assignments/explanation1.txt
-explanation2_text_file_address = ../assignments/explanation2.txt
+assignment_text_file_address = ../Assignments/assignment_text.txt
+assignment_sample_code_file_address = ../Assignments/assignment_sample_code.txt
+introduction_text_file_address = ../Assignments/introduction.txt
+explanation1_text_file_address = ../Assignments/explanation1.txt
+explanation2_text_file_address = ../Assignments/explanation2.txt
 
 # Source Code (uses the unit token)
 code_file_address = F:/UoPeople/CS 1102-01 - AY2026-T1/cs_1102_base/src/cs_1102_base/Unit_<UNIT_NUMBER>/Discussion_Assignment.java
 
 # Compiler / Runtime Output
-compiler_messages_file_address = ../assignments/compiler_messages.txt
-program_output_file_address = ../assignments/program_output.txt
+compiler_messages_file_address = ../Assignments/compiler_messages.txt
+program_output_file_address = ../Assignments/program_output.txt
 
 # Discussion Assignment Specific Inputs
-assignment_text_for_discussion_question_file_address = ../assignments/assignment_text_for_discussion_question.txt
-discussion_question_file_address = ../assignments/discussion_question.txt
-references_file_address = ../assignments/references_file_content.txt
+assignment_text_for_discussion_question_file_address = ../Assignments/assignment_text_for_discussion_question.txt
+discussion_question_file_address = ../Assignments/discussion_question.txt
+references_file_address = ../Assignments/references_file_content.txt
 
 # Final Output (contains the unit token)
-output_file_address = ../assignments/unit_<UNIT_NUMBER>_discussion_post.html
+output_file_address = ../Assignments/unit_<UNIT_NUMBER>_discussion_post.html
 
 # Enable/Disable Sections (true/false)
 include_assignment_text = true
@@ -64,6 +64,6 @@ include_explanation1 = false
 include_explanation2 = false
 include_assignment_text_for_discussion_question = false
 include_discussion_question = false
-tidy_html = true
+tidy_html = false
 tidy_debug = true
 
