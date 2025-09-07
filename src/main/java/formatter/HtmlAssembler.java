@@ -29,15 +29,15 @@ public class HtmlAssembler {
     private static final String FOOTER_STYLE =
             "margin-top:3rem; font-size:0.7rem; color:#555; opacity:0.85; text-align:center;";
 
-    public static String assemble(List<ContentBlock> blocks) {
+    public static String assemble(String unit, List<ContentBlock> blocks) {
         StringBuilder sb = new StringBuilder();
         sb.append("<!DOCTYPE html>\n<html lang=\"en\">")
           .append("\n<head>")
           .append("\n\t<meta charset=\"UTF-8\" />")
           .append("\n\t<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />")
-          .append("\n\t<title>Discussion Post</title>")
+          .append("\n\t<title>Discussion Post Unit ") .append(unit)  .append("</title>")
           .append("\n\t<meta name=\"author\" content=\"Joe Reeves\" />")
-          .append("\n</head>")
+          .append("\n</head>\n")
           .append("\n\n<body style=\"").append(BODY_STYLE).append("\">")
           .append("\n\t<main style=\"").append(MAIN_STYLE).append("\">");
 

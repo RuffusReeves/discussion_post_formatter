@@ -25,7 +25,8 @@ import java.util.*;
  */
 public final class Config {
 
-    private interface Line { String raw(); }
+    public static String unit;
+	private interface Line { String raw(); }
     private record CommentLine(String raw) implements Line {}
     private record BlankLine(String raw) implements Line {}
     private record EntryLine(String key, String value, String rawPrefix, String rawSuffix) implements Line {

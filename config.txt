@@ -1,3 +1,5 @@
+# Current Filename: config.txt
+#
 # Discussion Post Formatter Configuration
 # --------------------------------------
 # Edit the key = value pairs below. Lines starting with '#' are comments.
@@ -25,7 +27,7 @@
 #   The program normalizes entry lines to: key = value
 #
 # Core Settings
-unit = 0
+unit = 1
 theme = light
 
 # Input Text Sections
@@ -51,17 +53,17 @@ references_file_address = ../assignments/references_file_content.txt
 output_file_address = ../assignments/unit_<UNIT_NUMBER>_discussion_post.html
 
 # Enable/Disable Sections (true/false)
-tidy_html = true
-tidy_debug = true
 include_assignment_text = true
-include_sample_code = true
 include_introduction = true
-include_explanation1 = true
-include_explanation2 = true
 include_code_listing = true
 include_compiler_messages = true
 include_program_output = true
-include_assignment_text_for_discussion_question = true
-include_discussion_question = true
 include_references = true
+include_sample_code = false
+include_explanation1 = false
+include_explanation2 = false
+include_assignment_text_for_discussion_question = false
+include_discussion_question = false
+tidy_html = true
+tidy_debug = true
 
